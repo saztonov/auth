@@ -6,9 +6,9 @@
   "description": "Витрина порталов контура su10 (OIDC-клиент su10-launcher)",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "tsc -b --noEmit"
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "oidc-client-ts": "^3.1.0",

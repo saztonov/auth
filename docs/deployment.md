@@ -12,7 +12,7 @@ Keycloak — отдельный инфраструктурный сервис н
   keycloak/themes/su10/     # кастомная тема
   keycloak/providers/       # SPI-jar (bcrypt и т.п.)
   keycloak/realm/           # realm-as-code (su10-realm.yaml)
-/opt/infra/nginx/conf.d/auth.conf     # ingress (auth.su10.ru + auth-admin.su10.ru)
+/opt/infra/nginx/conf.d/keycloak.conf # ingress (auth.su10.ru + auth-admin.su10.ru)
 /opt/infra/launcher/dist/             # собранная SPA-витрина (статик)
 ```
 
@@ -46,7 +46,8 @@ docker run --rm --network edge curlimages/curl -s http://keycloak:9000/health/re
 
 ingress:
 ```bash
-cp /opt/infra/keycloak/deploy/nginx/conf.d/auth.conf /opt/infra/nginx/conf.d/auth.conf
+cp /opt/infra/keycloak/deploy/nginx/conf.d/keycloak.conf /opt/infra/nginx/conf.d/keycloak.conf
+# ЗАМЕНЯЕТ живой keycloak.conf: сначала backup, затем смержить allowlist/cert-пути с боевым
 # заполнить <VPN_OR_OFFICE_CIDR> в server-блоке auth-admin.su10.ru
 docker compose -p infra-nginx exec nginx nginx -t && \
 docker compose -p infra-nginx exec nginx nginx -s reload
@@ -62,7 +63,7 @@ curl -s https://auth.su10.ru/realms/su10/.well-known/openid-configuration | head
 Скрипт (запускать с dev-машины; хост/пути задаются переменными вверху скрипта):
 1. rsync инфры репозитория → `/opt/infra/keycloak` (compose, themes, providers, realm; **без** `.env`);
 2. сборка витрины (`launcher`: `npm ci && npm run build`) → rsync `dist/` → `/opt/infra/launcher/dist`;
-3. копия `deploy/nginx/conf.d/auth.conf` → `/opt/infra/nginx/conf.d/`, `nginx -t` + reload;
+3. копия `deploy/nginx/conf.d/keycloak.conf` → `/opt/infra/nginx/conf.d/` (заменяет живой keycloak.conf — backup + merge allowlist/cert вручную), `nginx -t` + reload;
 4. `docker compose -p keycloak up -d` (рестарт подхватывает темы и providers);
 5. накат realm: `docker compose -p keycloak --profile config run --rm config-cli`.
 

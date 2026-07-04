@@ -16,11 +16,33 @@ accountTheme: su10
 passwordPolicy: "length(8)"
 
 # Логин по email как username (порталы логинят по email).
-registrationAllowed: false        # открытая регистрация выключена (invite-based отдельно)
+# Регистрация — Вариант B: realm ЗАКРЫТ, регистрацию подрядчиков ведут порталы через Admin API
+# (create user + группа <портал>-pending). Открытой self-registration в корпоративном realm нет.
+registrationAllowed: false
 loginWithEmailAllowed: true
 duplicateEmailsAllowed: false
-resetPasswordAllowed: true
-verifyEmail: true
+# SMTP пока не настроен — почтовые функции выключены (включить позже вместе со smtpServer).
+resetPasswordAllowed: false
+verifyEmail: false
+
+# Интернационализация: контур русскоязычный — дефолт ru (иначе тема рендерится по-английски).
+internationalizationEnabled: true
+defaultLocale: ru
+supportedLocales:
+  - ru
+  - en
+
+# --- SMTP (хук на будущее; при появлении релея заполнить и включить verifyEmail/resetPasswordAllowed) ---
+# smtpServer:
+#   host: <smtp-host>
+#   port: "587"
+#   from: no-reply@su10.ru
+#   fromDisplayName: su10
+#   ssl: "false"
+#   starttls: "true"
+#   auth: "true"
+#   user: <smtp-user>
+#   password: $(env:SMTP_PASSWORD)
 
 clients:
   # ---------------------------------------------------------------- EstiMat (сметный портал)
@@ -31,6 +53,7 @@ clients:
     standardFlowEnabled: true
     directAccessGrantsEnabled: false
     secret: $(env:ESTIMAT_CLIENT_SECRET)
+    # loginTheme: estimat   # включить, когда тема estimat задеплоена (иначе KC откатится на дефолт su10)
     redirectUris:
       - https://estimat.su10.ru/api/auth/oidc/callback
     webOrigins:
@@ -81,7 +104,11 @@ clients:
     publicClient: false
     standardFlowEnabled: true
     directAccessGrantsEnabled: false
+    # Сервис-аккаунт для Admin API портала: регистрация подрядчиков (create user + пароль) и
+    # активация (перевод billhub-pending → billhub-active). Роли назначены ниже в users:.
+    serviceAccountsEnabled: true
     secret: $(env:BILLHUB_CLIENT_SECRET)
+    # loginTheme: billhub   # включить, когда тема billhub задеплоена (иначе KC откатится на дефолт su10)
     redirectUris:
       - https://rp.su10.ru/api/auth/oidc/callback
       - https://ravek.link/api/auth/oidc/callback
@@ -119,6 +146,17 @@ clients:
           jsonType.label: String
           access.token.claim: "true"
           id.token.claim: "true"
+      # Членство в группах → claim `groups` (гейт доступа BillHub: billhub-active). Имя группы,
+      # без полного пути (бэкенд принимает и имя, и `/<name>`).
+      - name: groups
+        protocol: openid-connect
+        protocolMapper: oidc-group-membership-mapper
+        config:
+          claim.name: groups
+          full.path: "false"
+          access.token.claim: "true"
+          id.token.claim: "false"
+          userinfo.token.claim: "true"
 
   # ---------------------------------------------------------------- Витрина порталов (SPA)
   - clientId: su10-launcher
@@ -148,3 +186,24 @@ roles:
     billhub:
       - name: access
         description: Доступ к порталу BillHub
+
+# Группы-гейты доступа к порталам (Вариант B). Подрядчик после регистрации попадает в
+# <портал>-pending (доступа нет); активация (админ Keycloak или админ портала через Admin API)
+# переводит в <портал>-active. Членство пробрасывается в токен маппером `groups` клиента.
+# Для EstiMat группы появятся при его миграции на групповой гейт (сейчас EstiMat гейтит ролью access).
+groups:
+  - name: billhub-pending
+  - name: billhub-active
+
+# Сервис-аккаунт клиента billhub для Admin REST (регистрация/активация подрядчиков).
+# Роли realm-management: view-users (чтение), manage-users (create user, пароль, членство в группах).
+# config-cli управляет только этим service-account-пользователем; прочие пользователи (AD и т.п.)
+# не описываются и не удаляются (import.managed.user=no-delete).
+users:
+  - username: service-account-billhub
+    enabled: true
+    serviceAccountClientId: billhub
+    clientRoles:
+      realm-management:
+        - view-users
+        - manage-users

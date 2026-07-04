@@ -1,20 +1,33 @@
 :root {
-  --su10-primary: #2b5ce6;
-  --su10-primary-hover: #1e46b8;
-  --bg: #f4f6fb;
+  /* Бренд su10 — приглушённая терракота */
+  --accent: #a05850;
+  --accent-hover: #8f4c44;
+  --link: #a05850;
+  /* Светлая тема */
+  --bg: #ffffff;
+  --bg-grad: #fdfbfb; /* лёгкий тёплый градиент */
   --card: #ffffff;
-  --text: #1a1f36;
-  --muted: #6b7280;
-  --border: #e6e9f2;
+  --tile: #ffffff;
+  --text: #1a1a1a;
+  --muted: #6b6b6b;
+  --border: #ececec;
+  --input-border: #ececec;
+  --shadow: rgba(26, 26, 26, 0.1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #12151f;
-    --card: #1b2030;
-    --text: #e7ebf5;
-    --muted: #9aa3b8;
-    --border: #2a3145;
+    --bg: #1b1615;
+    --bg-grad: #1b1615;
+    --card: #1a1a1a;
+    --tile: #1a1a1a;
+    --text: #ffffff;
+    --muted: #a6a09e;
+    --border: #2a2a2a;
+    --input-border: #2a2a2a;
+    /* accent тот же (#a05850); ссылки чуть светлее для контраста на тёмном фоне */
+    --link: #c97b6e;
+    --shadow: rgba(0, 0, 0, 0.45);
   }
 }
 
@@ -22,8 +35,9 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-grad) 100%) no-repeat fixed;
   color: var(--text);
 }
 
@@ -35,6 +49,16 @@ body {
   gap: 12px;
 }
 .state--error { color: #c0392b; }
+.state button {
+  background: var(--accent);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font: inherit;
+  cursor: pointer;
+}
+.state button:hover { background: var(--accent-hover); }
 
 .launcher { max-width: 1080px; margin: 0 auto; padding: 24px 20px 48px; }
 
@@ -48,20 +72,26 @@ body {
   border-bottom: 1px solid var(--border);
   margin-bottom: 28px;
 }
-.launcher__brand { font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
+.launcher__brand {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--accent);
+}
 .launcher__user { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
 .launcher__name { color: var(--muted); }
-.launcher__link { color: var(--su10-primary); text-decoration: none; font-weight: 500; }
+.launcher__link { color: var(--link); text-decoration: none; font-weight: 500; }
 .launcher__link:hover { text-decoration: underline; }
 .launcher__logout {
-  border: 1px solid var(--border);
+  border: 1px solid var(--input-border);
   background: transparent;
   color: var(--text);
   border-radius: 8px;
   padding: 6px 14px;
+  font: inherit;
   cursor: pointer;
 }
-.launcher__logout:hover { border-color: var(--su10-primary); color: var(--su10-primary); }
+.launcher__logout:hover { border-color: var(--accent); color: var(--accent); }
 
 .launcher__grid {
   display: grid;
@@ -75,7 +105,7 @@ body {
   flex-direction: column;
   gap: 8px;
   padding: 22px;
-  background: var(--card);
+  background: var(--tile);
   border: 1px solid var(--border);
   border-radius: 14px;
   text-decoration: none;
@@ -84,9 +114,9 @@ body {
 }
 .tile:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 30px rgba(26, 31, 54, 0.1);
-  border-color: var(--su10-primary);
+  box-shadow: 0 10px 30px var(--shadow);
+  border-color: var(--accent);
 }
-.tile__icon { font-size: 32px; }
+.tile__icon { color: var(--accent); line-height: 0; }
 .tile__name { font-size: 18px; font-weight: 700; }
 .tile__desc { font-size: 14px; color: var(--muted); }

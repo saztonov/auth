@@ -1,58 +1,234 @@
-/* Тема входа su10 — брендинг поверх стандартной темы Keycloak.
-   Плейсхолдерные цвета — заменить на брендбук su10. */
+/* Тема входа su10 — брендинг поверх стандартной темы Keycloak (parent=keycloak, PatternFly).
+   Палитра из утверждённых макетов su10 (07 dark / 08 light): терракота #A05850, тёплый near-black.
+   Селекторы намеренно широкие (pf-v5 + legacy + KC-id) для устойчивости к версии PatternFly в KC26.
+   Проверять рендер на живом KC (login / error / update-password) — см. план, раздел «Проверка». */
 
 :root {
-  --su10-primary: #2b5ce6;
-  --su10-primary-hover: #1e46b8;
-  --su10-bg: #f4f6fb;
+  --su10-accent: #a05850;
+  --su10-accent-hover: #8c4a43;
+  --su10-accent-ink: #ffffff;
+  --su10-ground: #ffffff;
   --su10-card: #ffffff;
-  --su10-text: #1a1f36;
+  --su10-border: #ece9e8;
+  --su10-text: #1a1714;
+  --su10-muted: #726a66;
+  --su10-field: #ffffff;
+  --su10-field-border: #e3dedb;
+  --su10-link: #a05850;
+  --su10-logo: url(../img/su10-logo.svg);
+  --su10-shadow: 0 24px 60px -28px rgba(40, 22, 18, .28);
 }
-
-body.login-pf,
-.login-pf body {
-  background: var(--su10-bg);
-}
-
-/* Карточка входа */
-.card-pf,
-.login-pf .card-pf {
-  background: var(--su10-card);
-  border: none;
-  border-radius: 14px;
-  box-shadow: 0 8px 30px rgba(26, 31, 54, 0.08);
-}
-
-/* Заголовок / логотип */
-#kc-header-wrapper {
-  color: var(--su10-text);
-  font-weight: 700;
-  letter-spacing: 0.5px;
-}
-
-/* Основная кнопка */
-.btn-primary,
-.pf-c-button.pf-m-primary {
-  background: var(--su10-primary);
-  border-color: var(--su10-primary);
-}
-.btn-primary:hover,
-.pf-c-button.pf-m-primary:hover {
-  background: var(--su10-primary-hover);
-  border-color: var(--su10-primary-hover);
-}
-
-/* Ссылки */
-a,
-#kc-registration a,
-#kc-info a {
-  color: var(--su10-primary);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --su10-bg: #12151f;
-    --su10-card: #1b2030;
-    --su10-text: #e7ebf5;
+    --su10-accent: #a05850;
+    --su10-accent-hover: #b06a62;
+    --su10-ground: #1b1615;
+    --su10-card: #1c1918;
+    --su10-border: #2b2523;
+    --su10-text: #f3efed;
+    --su10-muted: #9a908b;
+    --su10-field: #141110;
+    --su10-field-border: #322b28;
+    --su10-link: #c88a80;
+    --su10-logo: url(../img/su10-logo-dark.svg);
+    --su10-shadow: 0 28px 70px -30px rgba(0, 0, 0, .7);
+  }
+}
+
+/* фон страницы */
+body,
+body.login-pf,
+.login-pf body {
+  background: var(--su10-ground) !important;
+  color: var(--su10-text);
+}
+
+/* логотип su10 вместо текстового заголовка realm */
+#kc-header-wrapper {
+  font-size: 0 !important;
+  line-height: 0;
+  height: 50px;
+  margin-bottom: 22px;
+  color: transparent;
+  background: var(--su10-logo) center / contain no-repeat;
+}
+
+/* карточка */
+.card-pf,
+.login-pf .card-pf,
+#kc-content .card-pf {
+  background: var(--su10-card);
+  color: var(--su10-text);
+  border: 1px solid var(--su10-border);
+  border-radius: 18px;
+  box-shadow: var(--su10-shadow);
+}
+
+/* заголовок формы */
+#kc-page-title,
+#kc-form-header h1,
+#kc-form-header {
+  color: var(--su10-text);
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+/* подписи полей */
+label,
+.control-label,
+.pf-c-form__label,
+.pf-v5-c-form__label,
+.pf-c-form__label-text,
+.pf-v5-c-form__label-text {
+  color: var(--su10-muted);
+}
+
+/* поля ввода */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="number"],
+.form-control,
+.pf-c-form-control,
+.pf-v5-c-form-control,
+input.pf-v5-c-form-control {
+  background: var(--su10-field) !important;
+  color: var(--su10-text) !important;
+  border: 1px solid var(--su10-field-border) !important;
+  border-radius: 9px !important;
+}
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+.form-control:focus,
+.pf-c-form-control:focus,
+.pf-v5-c-form-control:focus {
+  border-color: var(--su10-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--su10-accent) 22%, transparent) !important;
+  outline: none !important;
+}
+
+/* основная кнопка */
+input[type="submit"].btn-primary,
+button.btn-primary,
+.btn-primary,
+#kc-login,
+.pf-c-button.pf-m-primary,
+.pf-v5-c-button.pf-m-primary {
+  background: var(--su10-accent) !important;
+  border-color: var(--su10-accent) !important;
+  color: var(--su10-accent-ink) !important;
+  border-radius: 9px !important;
+  font-weight: 700;
+}
+.btn-primary:hover,
+#kc-login:hover,
+.pf-c-button.pf-m-primary:hover,
+.pf-v5-c-button.pf-m-primary:hover {
+  background: var(--su10-accent-hover) !important;
+  border-color: var(--su10-accent-hover) !important;
+}
+
+/* второстепенные ссылки */
+a,
+#kc-registration a,
+#kc-info a,
+#kc-form-options a,
+.login-pf-page a {
+  color: var(--su10-link);
+}
+a:hover { text-decoration: underline; }
+
+/* чекбокс «запомнить меня» */
+input[type="checkbox"] { accent-color: var(--su10-accent); }
+
+/* акцентная рамка на ошибках */
+.alert-error,
+.pf-c-alert.pf-m-danger,
+.pf-v5-c-alert.pf-m-danger,
+#input-error,
+.kc-feedback-text {
+  border-left-color: var(--su10-accent);
+}
+
+/* ============================================================ Сплит-лейаут (вариант 1)
+   Терракотовая hero-панель слева (#kc-header) + форма без карточки справа (.card-pf).
+   CSS-only на стоковом DOM Keycloak — внутренности KC (required actions, OTP, passkeys, ошибки,
+   переключатель локали) не трогаются, рендерятся штатно в правой колонке.
+   Ниже 861px — одноколоночный fallback (базовые правила выше: логотип над формой).
+   Селекторы .login-pf-page/#kc-header/.card-pf зависят от разметки KC26 — при промахе деградирует
+   к центрированной карточке (не ломается). Финальную подгонку проверить на живом KC. */
+@media (min-width: 861px) {
+  body,
+  body.login-pf { margin: 0; }
+
+  .login-pf-page {
+    display: grid;
+    grid-template-columns: 46% 54%;
+    align-items: stretch;
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* левая hero-панель */
+  #kc-header {
+    grid-column: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin: 0;
+    padding: clamp(40px, 5vw, 66px);
+    background: linear-gradient(150deg, #a4483a, #86372b);
+    position: relative;
+    overflow: hidden;
+  }
+  #kc-header::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(255, 255, 255, .08) 0 1px, transparent 1px 34px),
+      repeating-linear-gradient(90deg, rgba(255, 255, 255, .08) 0 1px, transparent 1px 34px);
+    pointer-events: none;
+  }
+  #kc-header-wrapper {
+    position: relative;
+    height: 46px;
+    width: 210px;
+    max-width: 60%;
+    margin: 0;
+    font-size: 0;
+    color: transparent;
+    background: url(../img/su10-logo-onaccent.svg) left center / contain no-repeat;
+  }
+  #kc-header::after {
+    content: "Единый вход\A в порталы su10";
+    white-space: pre-line;
+    position: relative;
+    max-width: 13ch;
+    color: #fff;
+    font-family: "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+    font-weight: 800;
+    letter-spacing: -.02em;
+    line-height: 1.03;
+    font-size: clamp(30px, 3.4vw, 50px);
+  }
+
+  /* правая колонка — форма без карточки на фоне ground */
+  .login-pf-page .card-pf {
+    grid-column: 2;
+    align-self: center;
+    justify-self: center;
+    width: min(400px, 86%);
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }
 }

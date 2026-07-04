@@ -16,7 +16,7 @@ export function Launcher() {
   return (
     <div className="launcher">
       <header className="launcher__header">
-        <div className="launcher__brand">su10 · порталы</div>
+        <div className="launcher__brand">СУ_10 · порталы</div>
         <div className="launcher__user">
           <span className="launcher__name">{name}</span>
           <a className="launcher__link" href={accountConsoleUrl} target="_blank" rel="noreferrer">
@@ -37,9 +37,13 @@ export function Launcher() {
         )}
         {portals.map((p) => (
           <a key={p.id} className="tile" href={p.url}>
-            <span className="tile__icon" aria-hidden>
-              {p.icon}
-            </span>
+            {/* Иконка — статичная inline-SVG из config/portals (не пользовательский ввод,
+                поэтому безопасно). Плейсхолдер под реальное лого портала. */}
+            <span
+              className="tile__icon"
+              aria-hidden
+              dangerouslySetInnerHTML={{ __html: p.icon }}
+            />
             <span className="tile__name">{p.name}</span>
             <span className="tile__desc">{p.description}</span>
           </a>

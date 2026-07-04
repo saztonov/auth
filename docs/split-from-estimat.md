@@ -10,7 +10,7 @@
 | `deploy/infra-keycloak/docker-compose.yml` | `docker-compose.yml` (+ mount тем/providers, config-cli) |
 | `deploy/infra-keycloak/.env.example` | `.env.example` (+ переменные config-cli) |
 | `deploy/infra-keycloak/README.md` | `docs/deployment.md` + `README.md` |
-| `deploy/infra-nginx/conf.d/keycloak.conf` | `deploy/nginx/conf.d/auth.conf` (+ маршрут витрины) |
+| `deploy/infra-nginx/conf.d/keycloak.conf` | `deploy/nginx/conf.d/keycloak.conf` (+ маршрут витрины) |
 | `deploy/keycloak-ad-integration-guide.md` | `docs/ad-integration-guide.md` (обобщён на EstiMat + BillHub) |
 
 Новое, чего в EstiMat не было: кастомная тема (`keycloak/themes/su10`), realm-as-code

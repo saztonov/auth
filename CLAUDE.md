@@ -29,7 +29,7 @@
 - Docker-сеть `edge` (общая с infra-nginx и порталами). Наружу порты не публикуются — TLS терминирует
   `infra-nginx`, проксируя на `keycloak:8080`. Management-порт `9000` (health/metrics) — только внутри.
 - Раскладка на VPS: `/opt/infra/keycloak/` (compose + `.env` + `themes/` + `providers/`),
-  `/opt/infra/nginx/conf.d/auth.conf`, `/opt/infra/launcher/dist/` (собранная витрина).
+  `/opt/infra/nginx/conf.d/keycloak.conf`, `/opt/infra/launcher/dist/` (собранная витрина).
 - Домены: `auth.su10.ru` (публичный), `auth-admin.su10.ru` (админка, VPN allowlist).
 
 ## Keycloak-конвенции

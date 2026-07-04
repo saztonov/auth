@@ -58,10 +58,18 @@ services:
       KEYCLOAK_AVAILABILITYCHECK_ENABLED: "true"
       KEYCLOAK_AVAILABILITYCHECK_TIMEOUT: 120s
       IMPORT_FILES_LOCATIONS: /config/*.yaml
-      # Не удалять сущности, не описанные в файле (пользователей, AD-федерацию и т.п.).
+      # Подстановка $(env:VAR) в su10-realm.yaml (секреты клиентов) — иначе не разворачивается.
+      IMPORT_VARSUBSTITUTION_ENABLED: "true"
+      # Не удалять сущности, не описанные в файле (пользователи/AD, группы, клиенты, роли, scopes).
       IMPORT_MANAGED_GROUP_MEMBERSHIP: no-delete
       IMPORT_MANAGED_CLIENT_SCOPE: no-delete
       IMPORT_MANAGED_ROLE: no-delete
+      IMPORT_MANAGED_GROUP: no-delete
+      IMPORT_MANAGED_USER: no-delete
+      IMPORT_MANAGED_CLIENT: no-delete
+      # Секреты клиентов для $(env:...) в realm-yaml (значения — из .env, не в git).
+      ESTIMAT_CLIENT_SECRET: ${ESTIMAT_CLIENT_SECRET}
+      BILLHUB_CLIENT_SECRET: ${BILLHUB_CLIENT_SECRET}
     volumes:
       - ./keycloak/realm:/config:ro
     networks: [edge]

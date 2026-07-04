@@ -19,14 +19,16 @@ rsync -az --delete \
   --exclude '.env' \
   "${REPO_ROOT}/docker-compose.yml" \
   "$VPS_HOST:${KC_DIR}/docker-compose.yml"
-rsync -az --delete "${REPO_ROOT}/keycloak/" "$VPS_HOST:${KC_DIR}/keycloak/"
+rsync -az --delete --exclude 'providers/*.jar' "${REPO_ROOT}/keycloak/" "$VPS_HOST:${KC_DIR}/keycloak/"
 
 echo "==> [2/5] Сборка витрины (launcher) и деплой статики → ${LAUNCHER_DIST}"
 ( cd "${REPO_ROOT}/launcher" && npm ci && npm run build )
 rsync -az --delete "${REPO_ROOT}/launcher/dist/" "$VPS_HOST:${LAUNCHER_DIST}/"
 
-echo "==> [3/5] ingress: auth.conf → ${NGINX_CONF_DIR}"
-rsync -az "${REPO_ROOT}/deploy/nginx/conf.d/auth.conf" "$VPS_HOST:${NGINX_CONF_DIR}/auth.conf"
+echo "==> [3/5] ingress: keycloak.conf → ${NGINX_CONF_DIR}"
+# ВНИМАНИЕ: этот файл ЗАМЕНЯЕТ живой keycloak.conf на VPS — перед деплоем сделать backup live-конфига
+# и смержить allowlist/cert-пути вручную. `nginx -t` ниже идёт ДО reload и блокирует битую конфигурацию.
+rsync -az "${REPO_ROOT}/deploy/nginx/conf.d/keycloak.conf" "$VPS_HOST:${NGINX_CONF_DIR}/keycloak.conf"
 ssh "$VPS_HOST" "docker compose -p infra-nginx exec -T nginx nginx -t && \
                  docker compose -p infra-nginx exec -T nginx nginx -s reload"
 

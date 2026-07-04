@@ -1,10 +1,36 @@
-/* Брендинг Account Console su10 (наследует keycloak.v3).
-   Плейсхолдерные цвета — заменить на брендбук su10. */
+/* Тема Account Console su10 (v3, parent=keycloak.v3 — React/PatternFly).
+   Реструктуризация консоли невозможна — только брендинг через CSS-переменные PatternFly.
+   Палитра su10: акцент — терракота #A05850 (light/dark). */
 
 :root {
-  --pf-global--primary-color--100: #2b5ce6;
-  --pf-global--primary-color--200: #1e46b8;
-  --pf-global--link--Color: #2b5ce6;
+  /* PatternFly 5 (Account Console v3) */
+  --pf-v5-global--primary-color--100: #a05850;
+  --pf-v5-global--primary-color--200: #8c4a43;
+  --pf-v5-global--link--Color: #a05850;
+  --pf-v5-global--link--Color--hover: #8c4a43;
+  --pf-v5-global--active-color--100: #a05850;
+  /* legacy PatternFly (на случай старых сборок консоли) */
+  --pf-global--primary-color--100: #a05850;
+  --pf-global--primary-color--200: #8c4a43;
+  --pf-global--link--Color: #a05850;
+  --pf-global--link--Color--hover: #8c4a43;
 }
 
-/* Точечные правки шапки/логотипа можно добавлять здесь по мере кастомизации. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --pf-v5-global--link--Color: #c88a80;
+    --pf-v5-global--link--Color--hover: #d89b91;
+    --pf-global--link--Color: #c88a80;
+    --pf-global--link--Color--hover: #d89b91;
+  }
+}
+
+/* акцент на первичных кнопках (широкие селекторы для устойчивости к версии PF) */
+.pf-v5-c-button.pf-m-primary,
+.pf-c-button.pf-m-primary {
+  background-color: #a05850;
+}
+.pf-v5-c-button.pf-m-primary:hover,
+.pf-c-button.pf-m-primary:hover {
+  background-color: #8c4a43;
+}
