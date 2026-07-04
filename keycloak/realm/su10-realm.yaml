@@ -1,0 +1,150 @@
+# realm-as-code для контура su10 (формат keycloak-config-cli).
+# Накат: docker compose -p keycloak --profile config run --rm config-cli
+# Идемпотентно приводит realm su10 к описанному состоянию. Пользователи и AD-федерация здесь НЕ
+# описываются (управляются отдельно; config-cli настроен на no-delete для несписанных сущностей).
+#
+# Секреты клиентов НЕ хранить в открытом виде — подставляются из окружения config-cli через $(env:VAR).
+
+realm: su10
+enabled: true
+
+# Кастомная тема su10 (login + account) по умолчанию для realm; per-client можно переопределить.
+loginTheme: su10
+accountTheme: su10
+
+# Мягкая политика по умолчанию: native-хэш argon2 (не задаём hashAlgorithm — берётся дефолт 26/non-FIPS).
+passwordPolicy: "length(8)"
+
+# Логин по email как username (порталы логинят по email).
+registrationAllowed: false        # открытая регистрация выключена (invite-based отдельно)
+loginWithEmailAllowed: true
+duplicateEmailsAllowed: false
+resetPasswordAllowed: true
+verifyEmail: true
+
+clients:
+  # ---------------------------------------------------------------- EstiMat (сметный портал)
+  - clientId: estimat
+    enabled: true
+    protocol: openid-connect
+    publicClient: false
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    secret: $(env:ESTIMAT_CLIENT_SECRET)
+    redirectUris:
+      - https://estimat.su10.ru/api/auth/oidc/callback
+    webOrigins:
+      - https://estimat.su10.ru
+    attributes:
+      pkce.code.challenge.method: S256
+      post.logout.redirect.uris: https://estimat.su10.ru/
+    protocolMappers:
+      - name: audience-estimat
+        protocol: openid-connect
+        protocolMapper: oidc-audience-mapper
+        config:
+          included.client.audience: estimat
+          access.token.claim: "true"
+          id.token.claim: "false"
+      - name: email
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+        config:
+          user.attribute: email
+          claim.name: email
+          jsonType.label: String
+          access.token.claim: "true"
+          id.token.claim: "true"
+      - name: username
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+        config:
+          user.attribute: username
+          claim.name: preferred_username
+          jsonType.label: String
+          access.token.claim: "true"
+          id.token.claim: "true"
+      - name: client-roles
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-client-role-mapper
+        config:
+          usermodel.clientRoleMapping.clientId: estimat
+          claim.name: resource_access.estimat.roles
+          jsonType.label: String
+          multivalued: "true"
+          access.token.claim: "true"
+
+  # ---------------------------------------------------------------- BillHub
+  - clientId: billhub
+    enabled: true
+    protocol: openid-connect
+    publicClient: false
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    secret: $(env:BILLHUB_CLIENT_SECRET)
+    redirectUris:
+      - https://rp.su10.ru/api/auth/oidc/callback
+      - https://ravek.link/api/auth/oidc/callback
+      - https://www.ravek.link/api/auth/oidc/callback
+    webOrigins:
+      - https://rp.su10.ru
+      - https://ravek.link
+      - https://www.ravek.link
+    attributes:
+      pkce.code.challenge.method: S256
+      post.logout.redirect.uris: https://rp.su10.ru/##https://ravek.link/##https://www.ravek.link/
+    protocolMappers:
+      - name: audience-billhub
+        protocol: openid-connect
+        protocolMapper: oidc-audience-mapper
+        config:
+          included.client.audience: billhub
+          access.token.claim: "true"
+          id.token.claim: "false"
+      - name: email
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+        config:
+          user.attribute: email
+          claim.name: email
+          jsonType.label: String
+          access.token.claim: "true"
+          id.token.claim: "true"
+      - name: username
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-property-mapper
+        config:
+          user.attribute: username
+          claim.name: preferred_username
+          jsonType.label: String
+          access.token.claim: "true"
+          id.token.claim: "true"
+
+  # ---------------------------------------------------------------- Витрина порталов (SPA)
+  - clientId: su10-launcher
+    enabled: true
+    protocol: openid-connect
+    publicClient: true
+    standardFlowEnabled: true
+    directAccessGrantsEnabled: false
+    redirectUris:
+      - https://auth.su10.ru/*
+    webOrigins:
+      - https://auth.su10.ru
+    attributes:
+      pkce.code.challenge.method: S256
+      post.logout.redirect.uris: https://auth.su10.ru/
+
+# Клиентские роли (авторизацию порталы решают у себя; здесь — гейт доступа и справочные роли).
+roles:
+  client:
+    estimat:
+      - name: access
+        description: Доступ к порталу EstiMat
+      - name: admin
+      - name: engineer
+      - name: manager
+      - name: contractor
+    billhub:
+      - name: access
+        description: Доступ к порталу BillHub

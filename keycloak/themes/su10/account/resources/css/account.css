@@ -1,0 +1,10 @@
+/* Брендинг Account Console su10 (наследует keycloak.v3).
+   Плейсхолдерные цвета — заменить на брендбук su10. */
+
+:root {
+  --pf-global--primary-color--100: #2b5ce6;
+  --pf-global--primary-color--200: #1e46b8;
+  --pf-global--link--Color: #2b5ce6;
+}
+
+/* Точечные правки шапки/логотипа можно добавлять здесь по мере кастомизации. */

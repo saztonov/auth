@@ -1,0 +1,71 @@
+# Keycloak — корпоративный Identity Provider контура su10.
+# Отдельный инфраструктурный compose-проект (`-p keycloak`), разворачивается в /opt/infra/keycloak
+# и обновляется независимо от порталов. Наружу порты НЕ публикуются: TLS терминирует infra-nginx,
+# обращаясь к keycloak:8080 в сети edge. Management-порт 9000 (health/metrics) — только внутри сети.
+#
+#   docker network create edge            # если ещё не создана (общая с infra-nginx и порталами)
+#   cp .env.example .env                   # заполнить секреты (НЕ коммитить)
+#   docker compose up -d keycloak
+#   docker compose --profile config run --rm config-cli   # накатить realm/su10-realm.yaml
+
+services:
+  keycloak:
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.1}
+    container_name: keycloak
+    restart: unless-stopped
+    # start (без --optimized): официальный образ выполняет build при старте, подхватывая
+    # providers/ (bcrypt SPI) и темы. +10-20с к старту, но не нужен кастомный образ.
+    command: start
+    environment:
+      # --- БД ---
+      KC_DB: postgres
+      KC_DB_URL: ${KC_DB_URL}
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_DB_POOL_MAX_SIZE: ${KC_DB_POOL_MAX_SIZE:-20}
+      # --- Hostname / issuer ---
+      KC_HOSTNAME: ${KC_HOSTNAME}
+      KC_HOSTNAME_ADMIN: ${KC_HOSTNAME_ADMIN}
+      # --- За reverse proxy ---
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      # --- Health/metrics на management-порту 9000 ---
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      # --- Bootstrap-админ (ВРЕМЕННО, убрать после первичной настройки) ---
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=70"
+    volumes:
+      # Кастомная тема su10 (login + account). В проде кэш темы включён — после правок нужен рестарт.
+      - ./keycloak/themes/su10:/opt/keycloak/themes/su10:ro
+      # Кастомные SPI (bcrypt PasswordHashProvider и т.п.). start пересобирает build при старте.
+      - ./keycloak/providers:/opt/keycloak/providers:ro
+    mem_limit: 1536m
+    cpus: 1.5
+    networks: [edge]
+
+  # --- realm-as-code: одноразовый прогон keycloak-config-cli (профиль config) ---
+  # Приводит realm su10 к состоянию из keycloak/realm/su10-realm.yaml (идемпотентно).
+  config-cli:
+    image: ${KC_CONFIG_CLI_IMAGE:-adorsys/keycloak-config-cli:latest-26}
+    profiles: ["config"]
+    depends_on: [keycloak]
+    environment:
+      KEYCLOAK_URL: ${KEYCLOAK_URL:-http://keycloak:8080}
+      KEYCLOAK_USER: ${KEYCLOAK_ADMIN_USER}
+      KEYCLOAK_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_AVAILABILITYCHECK_ENABLED: "true"
+      KEYCLOAK_AVAILABILITYCHECK_TIMEOUT: 120s
+      IMPORT_FILES_LOCATIONS: /config/*.yaml
+      # Не удалять сущности, не описанные в файле (пользователей, AD-федерацию и т.п.).
+      IMPORT_MANAGED_GROUP_MEMBERSHIP: no-delete
+      IMPORT_MANAGED_CLIENT_SCOPE: no-delete
+      IMPORT_MANAGED_ROLE: no-delete
+    volumes:
+      - ./keycloak/realm:/config:ro
+    networks: [edge]
+
+networks:
+  edge:
+    external: true

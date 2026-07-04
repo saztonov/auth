@@ -1,0 +1,58 @@
+/* Тема входа su10 — брендинг поверх стандартной темы Keycloak.
+   Плейсхолдерные цвета — заменить на брендбук su10. */
+
+:root {
+  --su10-primary: #2b5ce6;
+  --su10-primary-hover: #1e46b8;
+  --su10-bg: #f4f6fb;
+  --su10-card: #ffffff;
+  --su10-text: #1a1f36;
+}
+
+body.login-pf,
+.login-pf body {
+  background: var(--su10-bg);
+}
+
+/* Карточка входа */
+.card-pf,
+.login-pf .card-pf {
+  background: var(--su10-card);
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(26, 31, 54, 0.08);
+}
+
+/* Заголовок / логотип */
+#kc-header-wrapper {
+  color: var(--su10-text);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+/* Основная кнопка */
+.btn-primary,
+.pf-c-button.pf-m-primary {
+  background: var(--su10-primary);
+  border-color: var(--su10-primary);
+}
+.btn-primary:hover,
+.pf-c-button.pf-m-primary:hover {
+  background: var(--su10-primary-hover);
+  border-color: var(--su10-primary-hover);
+}
+
+/* Ссылки */
+a,
+#kc-registration a,
+#kc-info a {
+  color: var(--su10-primary);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --su10-bg: #12151f;
+    --su10-card: #1b2030;
+    --su10-text: #e7ebf5;
+  }
+}
