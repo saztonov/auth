@@ -128,6 +128,7 @@ docker run --rm -e H12 -e H10 -v "${TMP}:/out" "${NODE_IMAGE}" node -e '
     for (const v of ["a","b","y"]) {
       const h="$2"+v+body;
       users.push({username:"poc-2"+v+"-c"+cost, enabled:true,
+        firstName:"Poc", lastName:"User-2"+v+"-c"+cost,  // профиль полный → не срабатывает VERIFY_PROFILE
         email:"poc-2"+v+"-c"+cost+"@example.invalid", emailVerified:true,
         credentials:[{type:"password", algorithm:"bcrypt",
           secretData:JSON.stringify({value:h}),
@@ -189,25 +190,6 @@ rehashed_algo() { # $1=username → печатает алгоритм credential
   # credentialData приходит JSON-строкой (…\"algorithm\":\"argon2\"…) — берём первый известный токен алгоритма.
   printf '%s' "${creds}" | grep -oE '(argon2|pbkdf2[a-z0-9-]*|bcrypt)' | head -1
 }
-
-# ============================ DIAG (ВРЕМЕННО — убрать после диагностики) ============================
-token_probe() { # $1=username → печатает только error/ключ access_token (без значения токена)
-  docker run --rm --network "${EDGE_NET}" -e PW -e U="$1" "${CURL_IMAGE}" sh -c \
-    'curl -s -d grant_type=password -d client_id='"${CLIENT}"' -d "username=$U" -d "password=$PW" \
-     http://'"${KC_CONTAINER}"':8080/realms/'"${REALM}"'/protocol/openid-connect/token' \
-    | grep -oE '"error":"[^"]*"|"error_description":"[^"]*"|"access_token"' | tr '\n' ' '; echo
-}
-info "[DIAG] пользователи realm:"
-kc get users -r "${REALM}" --fields username,enabled 2>&1 | tr -d '\n' | head -c 700; echo
-_did="$(uid_of poc-2b-c12)"
-info "[DIAG] credentials poc-2b-c12 (id=${_did:-НЕТ}) — secretData эндпоинт вырезает:"
-[[ -n "${_did}" ]] && { kc get "users/${_did}/credentials" -r "${REALM}" 2>&1 | tr -d '\n' | head -c 900; echo; }
-info "[DIAG] токен poc-2b-c12 (bcrypt-импорт):"; token_probe poc-2b-c12
-info "[DIAG] control: poc-control с argon2-паролем (kcadm set-password):"
-kc create users -r "${REALM}" -s username=poc-control -s enabled=true >/dev/null 2>&1 || true
-kc set-password -r "${REALM}" --username poc-control --new-password "${PW}" >/dev/null 2>&1 && echo "  set-password ok" || echo "  set-password FAIL"
-info "[DIAG] токен poc-control (argon2):"; token_probe poc-control
-# ============================ /DIAG ============================
 
 PARTIAL_USERS="poc-2a-c12 poc-2b-c12 poc-2y-c12 poc-2a-c10 poc-2b-c10 poc-2y-c10"
 info "[C] логин каждым вариантом (\$2a/\$2b/\$2y × cost{12,10}) и проверка перехэша"
