@@ -191,7 +191,7 @@ rehashed_algo() { # $1=username → печатает алгоритм credential
 }
 
 PARTIAL_USERS="poc-2a-c12 poc-2b-c12 poc-2y-c12 poc-2a-c10 poc-2b-c10 poc-2y-c10"
-info "[C] логин каждым вариантом ($2a/$2b/$2y × cost{12,10}) и проверка перехэша"
+info "[C] логин каждым вариантом (\$2a/\$2b/\$2y × cost{12,10}) и проверка перехэша"
 LOGIN_FAILS=0; REHASH_FAILS=0
 for u in ${PARTIAL_USERS}; do
   if login_ok "${u}"; then
