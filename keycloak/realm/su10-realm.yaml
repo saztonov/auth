@@ -270,13 +270,13 @@ roles:
 # vs внешний подрядчик. Realm-уровень (не привязано к порталу) — это факт про человека, нужен и для
 # будущей AD-миграции (подрядчики остаются на keycloak-local навсегда, сотрудники едут на keycloak-ad).
 # Простановка при импорте/провижининге — на стороне портала (знает роль/counterparty_id из своей БД).
+# ⚠️ У GroupRepresentation в Keycloak НЕТ поля description (в отличие от ролей) — config-cli падает
+# на парсинге, если его добавить. Значение поясняем только комментарием.
 groups:
   - name: billhub-pending
   - name: billhub-active
-  - name: employee
-    description: Штатный сотрудник компании (не подрядчик)
-  - name: contractor
-    description: Внешний подрядчик/контрагент
+  - name: employee   # штатный сотрудник компании (не подрядчик)
+  - name: contractor # внешний подрядчик/контрагент
 
 # Сервис-аккаунт клиента billhub для Admin REST (регистрация/активация подрядчиков).
 # Роли realm-management: view-users (чтение), manage-users (create user, пароль, членство в группах).
