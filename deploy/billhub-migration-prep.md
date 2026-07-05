@@ -119,3 +119,9 @@ docker cp keycloak:/tmp/su10-export /opt/infra/keycloak/backup-su10-$(date +%F) 
   `keycloak/realm/*` вместе, не по одному файлу.
 - **`config-cli` не применяет user-profile** — см. `bcrypt-provider-runbook.md`/скиллы (adorsys #979);
   профиль правится ТОЛЬКО `apply-userprofile.sh`, не через `su10-realm.yaml`.
+- **`kc.sh export`: `ERROR ... Unable to start the management interface on 0.0.0.0:9000 / Address already
+  in use`** — `kc.sh export` сам поднимает полноценный Quarkus-рантайм (порты 8080/9000). Запуск через
+  `docker exec` в УЖЕ работающий `keycloak`-контейнер конфликтует с live-процессом (общий network
+  namespace) — данные при этом экспортируются успешно, но следующий за этим краш обрывает скрипт до
+  `docker cp`. Исправлено: `export-realm-backup.sh` гоняет экспорт в ОТДЕЛЬНОМ одноразовом контейнере
+  (`docker create/start/cp/rm`, та же БД через `--env-file`), не трогая live keycloak.
