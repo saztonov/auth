@@ -122,6 +122,9 @@ bash keycloak/providers/bcrypt-spi/verify-bcrypt-poc.sh
   (двойной дефис). Использовать em-dash `—` или переформулировать. Исправлено в текущей версии.
 - **`cannot find symbol: class PasswordHashProviderFactory`** — фабрика лежит в артефакте
   `keycloak-server-spi-private` (не в `keycloak-server-spi`). Зависимость добавлена в `pom.xml`. Исправлено.
+- **`not abstract and does not override abstract method close()/init()/postInit()`** — в
+  `org.keycloak.provider.ProviderFactory` (KC 26.1.5) методы `init`/`postInit`/`close` абстрактные;
+  фабрика реализует их явно (no-op). Исправлено.
 - **Сборка не видит версию KC** — `build-jar.sh` берёт версию из контейнера `keycloak`; можно задать явно:
   `KC_VERSION=26.1.5 bash keycloak/providers/bcrypt-spi/build-jar.sh`.
 - **`docker: permission denied`** — запускать через `sudo bash …` или добавить пользователя в группу docker.
