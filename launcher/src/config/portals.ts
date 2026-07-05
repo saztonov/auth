@@ -12,9 +12,11 @@ const ICON_ESTIMAT: IconSvg =
 const ICON_BILLHUB: IconSvg =
   '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5h12V20l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3-2 1.3V3.5Z"/><path d="M9 8h6M9 12h6"/></svg>';
 
-// Портал контура su10. requiredRole — опциональный гейт: client-роль вида "<clientId>:<role>",
-// например "estimat:access". Точная фильтрация плиток по этому полю появится отдельным шагом
-// (см. hasPortalAccess ниже); сейчас витрина работает в режиме show-all.
+// Портал контура su10. Гейт плитки — ОДИН из двух (по факту доступа на самом портале):
+// - requiredRole "<clientId>:<role>" — портал без своей БД пользователей, гейтит client-ролью
+//   (эталон EstiMat: resource_access.estimat.roles).
+// - requiredGroup "<имя>" — портал с провижинингом/активацией через группы Keycloak
+//   (эталон BillHub: членство в billhub-active).
 export interface Portal {
   id: string;
   name: string;
@@ -22,6 +24,7 @@ export interface Portal {
   url: string;
   icon: IconSvg; // inline-SVG (currentColor); плейсхолдер под реальное лого портала
   requiredRole?: string;
+  requiredGroup?: string;
 }
 
 export const PORTALS: Portal[] = [
@@ -39,28 +42,32 @@ export const PORTALS: Portal[] = [
     description: 'Портал платежей и договоров',
     url: 'https://rp.su10.ru',
     icon: ICON_BILLHUB,
-    requiredRole: 'billhub:access',
+    requiredGroup: 'billhub-active',
   },
 ];
 
 // Доступность плитки портала.
 //
-// v1 = SHOW-ALL (fail-open): токен клиента `su10-launcher` сейчас не несёт claim'ов `resource_access`
-// (client-роли) и `groups`, поэтому для всех порталов возвращается true — витрина показывает все
-// плитки. Гейтинг доступа выполняют сами порталы на своём OIDC-callback:
-//   • EstiMat — по client-роли `access` (resource_access.estimat.roles);
-//   • BillHub — по членству в группе `billhub-active`.
-//
-// Точная фильтрация плиток на стороне витрины появится отдельным шагом и потребует добавить в токен
-// клиента `su10-launcher` мапперы `groups` + client-роли. До тех пор логику fail-open НЕ ужесточаем:
-// если данных о ролях в токене нет — плитку не скрываем.
+// v2 = фильтрация по реальным правам. Клиенту `su10-launcher` в su10-realm.yaml добавлены мапперы
+// resource_access.estimat.roles + groups (id.token.claim — эта SPA не делает loadUserInfo, user.profile
+// берётся только из id_token). Раз мапперы задеплоены — отсутствие требуемой роли/группы в токене
+// значит ОТКАЗ (fail-closed), а не "данные ещё не пришли": v1 показывал все плитки всем именно потому,
+// что мапперов не было вообще (см. git-историю), сейчас это уже не так.
 export function hasPortalAccess(user: User | null | undefined, portal: Portal): boolean {
-  if (!portal.requiredRole) return true;
-  const [client, role] = portal.requiredRole.split(':');
-  const resourceAccess = (user?.profile as Record<string, unknown> | undefined)?.[
-    'resource_access'
-  ] as Record<string, { roles?: string[] }> | undefined;
-  const roles = resourceAccess?.[client]?.roles;
-  if (!roles) return true; // нет данных о ролях в токене — не скрываем (fail-open, см. выше)
-  return roles.includes(role);
+  const profile = user?.profile as Record<string, unknown> | undefined;
+
+  if (portal.requiredRole) {
+    const [client, role] = portal.requiredRole.split(':');
+    const resourceAccess = profile?.['resource_access'] as
+      | Record<string, { roles?: string[] }>
+      | undefined;
+    return (resourceAccess?.[client]?.roles ?? []).includes(role);
+  }
+
+  if (portal.requiredGroup) {
+    const groups = profile?.['groups'] as string[] | undefined;
+    return (groups ?? []).includes(portal.requiredGroup);
+  }
+
+  return true;
 }

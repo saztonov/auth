@@ -221,6 +221,31 @@ clients:
     attributes:
       pkce.code.challenge.method: S256
       post.logout.redirect.uris: https://auth.su10.ru/
+    protocolMappers:
+      # Витрина фильтрует плитки порталов (launcher/src/config/portals.ts::hasPortalAccess) — ей нужны
+      # claim'ы resource_access.estimat.roles (EstiMat, гейт по client-роли) и groups (BillHub, гейт по
+      # группе billhub-active). ⚠️ id.token.claim ОБЯЗАТЕЛЕН: у SPA нет loadUserInfo, react-oidc-context
+      # берёт user.profile ИСКЛЮЧИТЕЛЬНО из id_token — в отличие от мапперов estimat/billhub (те кладут
+      # только в access_token, т.к. их читают BFF-бэкенды порталов на своей стороне, не браузер).
+      - name: resource-access-estimat
+        protocol: openid-connect
+        protocolMapper: oidc-usermodel-client-role-mapper
+        config:
+          usermodel.clientRoleMapping.clientId: estimat
+          claim.name: resource_access.estimat.roles
+          jsonType.label: String
+          multivalued: "true"
+          id.token.claim: "true"
+          access.token.claim: "true"
+      - name: groups
+        protocol: openid-connect
+        protocolMapper: oidc-group-membership-mapper
+        config:
+          claim.name: groups
+          full.path: "false"
+          id.token.claim: "true"
+          access.token.claim: "true"
+          userinfo.token.claim: "true"
 
 # Клиентские роли (авторизацию порталы решают у себя; здесь — гейт доступа и справочные роли).
 roles:
