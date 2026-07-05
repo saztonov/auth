@@ -13,7 +13,7 @@ Handoff-документ: что подготовлено в контуре su10
 | User-profile (`billhub_user_id` managed + `ADMIN_EDIT`, firstName/lastName required) | ✅ применён прямым PUT | `su10-userprofile.json` + `apply-userprofile.sh` |
 | Группы `billhub-pending`/`billhub-active` | ✅ | `su10-realm.yaml` |
 | Сервис-аккаунт billhub (view/manage-users) | ✅ | `su10-realm.yaml` |
-| **Импорт-клиент `billhub-import` (manage-realm)** | ⏳ в realm-as-code, **enabled:false** — включить на окно миграции | `su10-realm.yaml` |
+| **Импорт-клиент `billhub-import` (manage-realm)** | ✅ на su10, **доказан** `verify-import-creds.sh` (partialImport=200); сейчас `enabled:false` — включить на окно миграции | `su10-realm.yaml`, `verify-import-creds.sh` |
 
 ## Импорт-креды (для CLI импорта Ф3)
 
@@ -84,7 +84,19 @@ docker cp keycloak:/tmp/su10-export /opt/infra/keycloak/backup-su10-$(date +%F) 
 (realm-as-code и так в git; экспорт — доп. страховка на состояние живого realm.)
 
 ## Что остаётся закрыть (не auth-код)
-- ⬜ Реализовать и протестировать CLI импорта + Ф1/Ф2/Ф4 (billhub).
-- ⬜ Сгенерировать `BILLHUB_IMPORT_CLIENT_SECRET`, положить в su10 `.env`, накатить + включить клиент.
+- ✅ Реализовать и протестировать CLI импорта + Ф1/Ф2/Ф4 (billhub) — сделано, закоммичено (2026-07-06).
+- ✅ Сгенерировать `BILLHUB_IMPORT_CLIENT_SECRET`, положить в su10 `.env`, накатить — сделано и доказано
+  `verify-import-creds.sh` (2026-07-05). Клиент сейчас `enabled:false` — **включить** перед реальным импортом
+  (шаг 3 выше), выключить сразу после.
 - ⬜ Сверить `OIDC_CLIENT_SECRET` billhub с `BILLHUB_CLIENT_SECRET` в su10 `.env`.
 - ⬜ Бэкапы + метка cutover.
+- ⬜ Сам cutover: preflight → dry-run → backup → import → канарейка → флип (см. траблшутинг ниже).
+
+## Траблшутинг (специфично для этого раздела)
+- **`.env` на VPS `640 root:docker`** — писать секрет только `sudo tee -a .env` (не `>>`).
+- **config-cli «Cannot resolve variable env:...» даже после добавления секрета в `.env`** — на VPS мог
+  остаться устаревший `docker-compose.yml` (секрет пробрасывается в config-cli именно через него). Смотри
+  общее правило в `CLAUDE.md` («Инфраструктура»): при ручном патче копировать `docker-compose.yml` +
+  `keycloak/realm/*` вместе, не по одному файлу.
+- **`config-cli` не применяет user-profile** — см. `bcrypt-provider-runbook.md`/скиллы (adorsys #979);
+  профиль правится ТОЛЬКО `apply-userprofile.sh`, не через `su10-realm.yaml`.

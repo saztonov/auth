@@ -31,6 +31,12 @@
 - Раскладка на VPS: `/opt/infra/keycloak/` (compose + `.env` + `themes/` + `providers/`),
   `/opt/infra/nginx/conf.d/keycloak.conf`, `/opt/infra/launcher/dist/` (собранная витрина).
 - Домены: `auth.su10.ru` (публичный), `auth-admin.su10.ru` (админка, VPN allowlist).
+- `.env` на VPS — `640 root:docker`: читать может группа docker, **писать — только root**
+  (`sudo tee -a .env`, не `>>` напрямую).
+- Ручной (не через `deploy-auth.sh`) патч VPS: копировать **все** связанные файлы разом
+  (`docker-compose.yml` + `keycloak/realm/*` + скрипты) — частичный `cp` одного файла даёт неочевидные
+  ошибки (напр. config-cli «Cannot resolve variable env:...», если секрет проброшен в новом
+  `docker-compose.yml`, а старый ещё не скопирован).
 
 ## Keycloak-конвенции
 - Realm — **`su10`**, единый на весь контур. Порталы — клиенты в нём (`estimat`, `billhub`,
