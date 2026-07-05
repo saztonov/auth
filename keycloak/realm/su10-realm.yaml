@@ -126,7 +126,6 @@ clients:
     # активация (перевод billhub-pending → billhub-active). Роли назначены ниже в users:.
     serviceAccountsEnabled: true
     secret: $(env:BILLHUB_CLIENT_SECRET)
-    loginTheme: billhub
     redirectUris:
       - https://rp.su10.ru/api/auth/oidc/callback
       - https://ravek.link/api/auth/oidc/callback
@@ -138,6 +137,9 @@ clients:
     attributes:
       pkce.code.challenge.method: S256
       post.logout.redirect.uris: https://rp.su10.ru/##https://ravek.link/##https://www.ravek.link/
+      # Брендированная login-тема billhub. ⚠️ В ClientRepresentation НЕТ top-level поля loginTheme —
+      # config-cli падает на нём; тема клиента хранится как атрибут login_theme (админка = «Login theme»).
+      login_theme: billhub
     protocolMappers:
       - name: audience-billhub
         protocol: openid-connect
