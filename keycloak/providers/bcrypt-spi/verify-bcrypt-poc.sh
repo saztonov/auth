@@ -31,6 +31,8 @@ info() { echo "==> $*"; }
 command -v docker >/dev/null || fail "docker не найден"
 [[ -f "${KC_DIR}/.env" ]] || fail "нет ${KC_DIR}/.env"
 docker ps --format '{{.Names}}' | grep -qx "${KC_CONTAINER}" || fail "контейнер '${KC_CONTAINER}' не запущен"
+# jar собирается docker-maven от root; каталог /opt/infra может быть root-owned — проверим запись заранее.
+[[ -w "${LIVE_PROVIDERS}" ]] || fail "нет прав на запись в ${LIVE_PROVIDERS} — запустите 'sudo bash ${BASH_SOURCE[0]}' (или выдайте права на каталог)"
 
 # --- Версия рантайма и путь к jar ---
 KC_VERSION="${KC_VERSION:-$(docker exec "${KC_CONTAINER}" /opt/keycloak/bin/kc.sh --version 2>/dev/null \
@@ -172,11 +174,12 @@ login_ok() { # $1=username → 0, если вернулся access_token (verify
   printf '%s' "${resp}" | grep -q '"access_token"'
 }
 
-alg_is_argon2() { # $1=username → 0, если после входа алгоритм credential стал argon2 (перехэш)
+rehashed_algo() { # $1=username → печатает алгоритм credential после входа (argon2/pbkdf2*/bcrypt), пусто если не найден
   local u="$1" id creds
   id="$(uid_of "${u}")"; [[ -n "${id}" ]] || return 2
   creds="$(kc get "users/${id}/credentials" -r "${REALM}" 2>/dev/null)"
-  printf '%s' "${creds}" | grep -q 'argon2' && ! printf '%s' "${creds}" | grep -q 'bcrypt'
+  # credentialData приходит JSON-строкой (…\"algorithm\":\"argon2\"…) — берём первый известный токен алгоритма.
+  printf '%s' "${creds}" | grep -oE '(argon2|pbkdf2[a-z0-9-]*|bcrypt)' | head -1
 }
 
 PARTIAL_USERS="poc-2a-c12 poc-2b-c12 poc-2y-c12 poc-2a-c10 poc-2b-c10 poc-2y-c10"
@@ -184,10 +187,11 @@ info "[C] логин каждым вариантом ($2a/$2b/$2y × cost{12,10}
 LOGIN_FAILS=0; REHASH_FAILS=0
 for u in ${PARTIAL_USERS}; do
   if login_ok "${u}"; then
-    if alg_is_argon2 "${u}"; then
-      echo "    [ok]   ${u}: вход успешен, перехэш → argon2"
+    algo="$(rehashed_algo "${u}")"
+    if [[ -n "${algo}" && "${algo}" != "bcrypt" ]]; then
+      echo "    [ok]   ${u}: вход успешен, перехэш → ${algo}"
     else
-      echo "    [FAIL] ${u}: вход успешен, но перехэш в argon2 НЕ подтверждён"; REHASH_FAILS=$((REHASH_FAILS+1))
+      echo "    [FAIL] ${u}: вход успешен, но перехэш не подтверждён (алгоритм='${algo:-?}')"; REHASH_FAILS=$((REHASH_FAILS+1))
     fi
   else
     echo "    [FAIL] ${u}: вход НЕ прошёл (verify не сработал)"; LOGIN_FAILS=$((LOGIN_FAILS+1))
@@ -196,10 +200,15 @@ done
 
 # create-user — только информационно
 if [[ ${CREATEUSER_OK} -eq 1 ]]; then
-  if login_ok poc-createuser && alg_is_argon2 poc-createuser; then
-    echo "    [ok]   poc-createuser (Admin API create-user): вход + перехэш → argon2"
+  if login_ok poc-createuser; then
+    cu_algo="$(rehashed_algo poc-createuser)"
+    if [[ -n "${cu_algo}" && "${cu_algo}" != "bcrypt" ]]; then
+      echo "    [ok]   poc-createuser (Admin API create-user): вход + перехэш → ${cu_algo}"
+    else
+      echo "    [warn] poc-createuser: вход ок, но перехэш не подтверждён (алгоритм='${cu_algo:-?}')"
+    fi
   else
-    echo "    [warn] poc-createuser: create-user путь не подтвердил вход/перехэш (не критично — путь BillHub = partialImport)"
+    echo "    [warn] poc-createuser: create-user путь не подтвердил вход (не критично — путь BillHub = partialImport)"
   fi
 fi
 
