@@ -47,7 +47,7 @@ token() { # $1=client_id $2=grant(password|client_credentials) [uses ADMIN_* or 
   fi | grep -oE '"access_token":"[^"]+"' | cut -d'"' -f4
 }
 adm_get() { docker run --rm --network "${EDGE_NET}" -e AT="${ADMIN_TOKEN}" "${CURL_IMAGE}" sh -c \
-  'curl -s -H "Authorization: Bearer $AT" http://'"${KC_CONTAINER}"':8080/admin/realms/'"${REALM}"'/'"$1"; }
+  'curl -s -H "Authorization: Bearer $AT" "http://'"${KC_CONTAINER}"':8080/admin/realms/'"${REALM}"'/'"$1"'"'; }
 adm_send() { # $1=method $2=path ; body on stdin ; prints http code
   docker run --rm -i --network "${EDGE_NET}" -e AT="${ADMIN_TOKEN}" "${CURL_IMAGE}" sh -c \
     'curl -s -o /dev/null -w "%{http_code}" -X '"$1"' -H "Authorization: Bearer $AT" -H "Content-Type: application/json" \
