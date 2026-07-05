@@ -53,66 +53,14 @@ supportedLocales:
 #   password: <задать через переменную окружения config-cli при включении SMTP>
 
 # --- Declarative User Profile (KC 26) ---
-# KC 26 по умолчанию ОТКЛЮЧАЕТ «неуправляемые» атрибуты: атрибут, не описанный в user-profile, при
-# create/import через Admin API молча отбрасывается. Порталам нужен стабильный correlation-key в
-# атрибуте пользователя (напр. billhub_user_id = внутренний users.id BillHub) — иначе маппер
-# billhub_user_id клиента пробросит пустоту. Поэтому:
-#  - явно описываем стандартные атрибуты (иначе unmanagedAttributePolicy игнорируется);
-#  - firstName/lastName обязательны для роли user (без них VERIFY_PROFILE ломает вход; сервис-аккаунты
-#    роль user не несут → их required не блокирует);
-#  - unmanagedAttributePolicy: ADMIN_EDIT — корреляционные ключи порталов (billhub_user_id и т.п.)
-#    выставляются/читаются ТОЛЬКО через Admin API/импорт, конечному пользователю не видны и им не правятся.
-# ⚠️ Меняет user-profile живого realm — применять config-cli аккуратно (сначала прогон на тест-realm/dry-run).
-userProfile:
-  attributes:
-    - name: username
-      displayName: "${username}"
-      validations:
-        length: { min: 3, max: 255 }
-        username-prohibited-characters: {}
-        up-username-not-idn-homograph: {}
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-    - name: email
-      displayName: "${email}"
-      validations:
-        email: {}
-        length: { max: 255 }
-      required:
-        roles: ["user"]
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-    - name: firstName
-      displayName: "${firstName}"
-      validations:
-        length: { max: 255 }
-        person-name-prohibited-characters: {}
-      required:
-        roles: ["user"]
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-    - name: lastName
-      displayName: "${lastName}"
-      validations:
-        length: { max: 255 }
-        person-name-prohibited-characters: {}
-      required:
-        roles: ["user"]
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-  groups:
-    - name: user-metadata
-      displayHeader: "User metadata"
-      displayDescription: "Attributes, which refer to user metadata"
-  unmanagedAttributePolicy: ADMIN_EDIT
+# ВНИМАНИЕ: keycloak-config-cli 6.x секцию `userProfile` в realm-import НЕ применяет (adorsys #979 —
+# оставляет профиль дефолтным; проверено на тест-realm up-poc). Поэтому профиль тут НЕ описываем, а
+# применяем ОТДЕЛЬНО прямым Admin API PUT /users/profile:
+#     конфиг  → keycloak/realm/su10-userprofile.json
+#     накат   → keycloak/realm/apply-userprofile.sh   (ПОСЛЕ config-cli; см. deploy-auth.sh)
+# Профиль нужен, чтобы: (1) сохранять управляемый атрибут `billhub_user_id` (иначе KC 26 отбрасывает
+# неописанные атрибуты, и маппер billhub_user_id ниже пробросит пустоту); (2) держать firstName/lastName
+# обязательными для роли user (VERIFY_PROFILE). Доказано скриптом verify-userprofile-poc.sh (2026-07-05).
 
 clients:
   # ---------------------------------------------------------------- EstiMat (сметный портал)
