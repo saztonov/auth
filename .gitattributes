@@ -1,0 +1,2 @@
+# Shell-скрипты исполняются на Linux-VPS — жёстко LF, чтобы не ловить `^M`/bad interpreter.
+*.sh text eol=lf
