@@ -14,7 +14,7 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.release>17</maven.compiler.release>
-    <!-- Переопределяется из build-jar.sh: -Dkeycloak.version=<детект kc.sh --version> -->
+    <!-- Переопределяется из build-jar.sh флагом -Dkeycloak.version (значение из детекта версии рантайма) -->
     <keycloak.version>26.1.5</keycloak.version>
     <bcrypt.version>0.10.2</bcrypt.version>
     <junit.version>5.10.2</junit.version>
