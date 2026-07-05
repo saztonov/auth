@@ -39,6 +39,11 @@ services:
     volumes:
       # Кастомная тема su10 (login + account). В проде кэш темы включён — после правок нужен рестарт.
       - ./keycloak/themes/su10:/opt/keycloak/themes/su10:ro
+      # Login-тема billhub (per-client loginTheme, CSS/JS-оверлей на keycloak.v2, без своего login.ftl).
+      # Исходник — репозиторий billhub (deploy/keycloak-theme/billhub/); сюда попадает копированием на
+      # VPS (та же машина, что и keycloak) — НЕ git-tracked в этом репо, зона портала. Пусто до первого
+      # деплоя темы — если каталог отсутствует, просто нет этого маунта (создать перед up).
+      - ./keycloak/themes/billhub:/opt/keycloak/themes/billhub:ro
       # Кастомные SPI (bcrypt PasswordHashProvider и т.п.). start пересобирает build при старте.
       - ./keycloak/providers:/opt/keycloak/providers:ro
     mem_limit: 1536m

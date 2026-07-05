@@ -126,7 +126,7 @@ clients:
     # активация (перевод billhub-pending → billhub-active). Роли назначены ниже в users:.
     serviceAccountsEnabled: true
     secret: $(env:BILLHUB_CLIENT_SECRET)
-    # loginTheme: billhub   # включить, когда тема billhub задеплоена (иначе KC откатится на дефолт su10)
+    loginTheme: billhub
     redirectUris:
       - https://rp.su10.ru/api/auth/oidc/callback
       - https://ravek.link/api/auth/oidc/callback
