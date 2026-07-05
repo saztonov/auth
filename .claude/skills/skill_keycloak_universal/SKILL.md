@@ -23,6 +23,13 @@ description: >-
 ## Факты контура su10 (цель интеграции, не менять)
 - issuer `https://auth.su10.ru/realms/su10` (KC 26.1); discovery `…/.well-known/openid-configuration`.
 - Публичный домен `auth.su10.ru`; админка `auth-admin.su10.ru`. Сеть docker `edge`. TLS терминирует infra-nginx.
+- ⚠️ **Admin REST API (`/admin/*`) НЕ проксируется на `auth.su10.ru`** — там из Keycloak доступны только
+  префиксы `realms|resources|js` (см. `deploy/nginx/conf.d/keycloak.conf`); всё остальное падает на
+  SPA-fallback витрины `su10-launcher` (`try_files … /index.html`) — получите **200 с HTML**, а не 4xx,
+  что легко принять за баг роутинга, а не за ожидаемое поведение. Admin-вызовы (create-user,
+  partialImport, group-membership) — через `auth-admin.su10.ru` (пока открыт всем IP, план — закрыть
+  SSH-туннелями) ИЛИ, надёжнее, напрямую по docker-сети `edge`: `http://keycloak:8080` — не зависит от
+  будущего запирания `auth-admin.su10.ru`, работает если backend портала подключён к той же сети.
 - Регистрация на IdP **закрыта** (`registrationAllowed=false`, Вариант B — провижининг через Admin API портала). `verifyEmail`/`resetPasswordAllowed=false`, **SMTP пока нет**.
 - realm-as-code накатывается keycloak-config-cli; секреты клиентов — через переменные окружения config-cli (`<PORTAL>_CLIENT_SECRET`), не в git.
 - У каждого портала может быть **своя login-тема** (per-client `loginTheme`), лежит в репо портала.
@@ -51,6 +58,9 @@ description: >-
 ## Шаг 2. Backend портала — OIDC/BFF-поток
 Эталон — `billhub/server/src/routes/auth-keycloak.ts` + `services/auth/keycloak/*`. Библиотека `openid-client` (v6).
 - **Env:** `OIDC_ISSUER`, `OIDC_CLIENT_ID=<portal>`, `OIDC_CLIENT_SECRET` (тот же, что в su10 `.env`), `OIDC_REDIRECT_URI`, `OIDC_POST_LOGOUT_REDIRECT_URI`, `OIDC_SCOPES=openid email profile`; для гейта-по-группе — `KC_ADMIN_*`, `KC_PORTAL_GROUP_*`.
+  ⚠️ **`KC_ADMIN_BASE_URL` НЕ выводить из `OIDC_ISSUER`** (тот указывает на `auth.su10.ru`, где `/admin/*`
+  не проксируется — см. «Факты контура» выше). Задать явно: `http://keycloak:8080` (если backend портала
+  на сети `edge`) или временно `https://auth-admin.su10.ru`.
 - **Login:** PKCE-challenge (S256) + state/nonce в короткоживущей httpOnly-cookie → redirect на Keycloak.
 - **Callback:** обмен code, верификация id_token (iss/aud/nonce/state), достать `{sub,email,emailVerified,preferredUsername, <portal>_user_id?}`. Токены — в httpOnly-cookie (BFF), браузер их не видит.
 - **Гейт per-request:** `jwtVerify` по JWKS Keycloak (`iss=issuer`, `aud=<portal>`, проверить `azp=<portal>`).
