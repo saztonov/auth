@@ -102,14 +102,28 @@ docker cp keycloak:/tmp/su10-export /opt/infra/keycloak/backup-su10-$(date +%F) 
 ```
 (realm-as-code и так в git; экспорт — доп. страховка на состояние живого realm.)
 
-## Что остаётся закрыть (не auth-код)
-- ✅ Реализовать и протестировать CLI импорта + Ф1/Ф2/Ф4 (billhub) — сделано, закоммичено (2026-07-06).
-- ✅ Сгенерировать `BILLHUB_IMPORT_CLIENT_SECRET`, положить в su10 `.env`, накатить — сделано и доказано
-  `verify-import-creds.sh` (2026-07-05). Клиент сейчас `enabled:false` — **включить** перед реальным импортом
-  (шаг 3 выше), выключить сразу после.
-- ⬜ Сверить `OIDC_CLIENT_SECRET` billhub с `BILLHUB_CLIENT_SECRET` в su10 `.env`.
-- ⬜ Бэкапы + метка cutover.
-- ⬜ Сам cutover: preflight → dry-run → backup → import → канарейка → флип (см. траблшутинг ниже).
+## Статус на 2026-07-06 (после боевого импорта)
+- ✅ CLI импорта + Ф1/Ф2/Ф4 (billhub) — реализовано, закоммичено.
+- ✅ Импорт-креды доказаны (`verify-import-creds.sh`: client_credentials=200, partialImport=200). Диагностика
+  раннего 401 закрыта — причина была на billhub-стороне (забыт `KC_IMPORT_CLIENT_ID`, `URLSearchParams`
+  тихо слал `client_id=undefined`), не секрет (сверен sha256).
+- ✅ **Боевой импорт выполнен**: 195 users (182 `billhub-active`, 14 `billhub-pending`), sample-spot-check
+  зелёный (`billhub_user_id`/`emailVerified`/членство). Импорт-клиент снова `enabled:false`.
+- ✅ Группы `employee`/`contractor` заведены (тип персоны виден в консоли KC) — членство проставит billhub
+  отдельным скриптом позже (не блокер флипа).
+- ✅ Витрина `su10-launcher` фильтрует плитки по правам (fail-closed): мапперы `resource_access`/`groups`
+  накатаны config-cli; `launcher/dist` собран и закоммичен.
+- ✅ Login-тема `billhub` активна (`attributes.login_theme` на клиенте, том смонтирован, форма
+  брендированная). Остаётся косметика CSS (лейбл «Пароль» наезжает) — правит billhub.
+
+### Гейты до флипа (осталось)
+- ⬜ **Деплой витрины** в `/opt/infra/launcher/dist/` (мапперы уже накатаны → безопасно, окна «0 плиток» нет).
+- ⬜ **CSS-фикс темы** (billhub) + рестарт KC (кэш темы в проде).
+- ⬜ **Канарейка** (критический гейт): реальный импортированный юзер входит старым bcrypt-паролем при
+  `AUTH_MODE=keycloak` на ОДНОМ инстансе → проверить: вход (bcrypt verify), перехэш в argon2, гейт по
+  `billhub-active`, резолв `billhub_user_id`, роль из БД, SSO, logout. Остальные инстансы — standalone.
+- ⬜ **Полный флип** `AUTH_MODE=keycloak` — только после зелёной канарейки. Откат = `AUTH_MODE=standalone`
+  (не удалять `password_hash`/standalone-код/refresh-таблицы до конца окна отката).
 
 ## Траблшутинг (специфично для этого раздела)
 - **`.env` на VPS `640 root:docker`** — писать секрет только `sudo tee -a .env` (не `>>`).
