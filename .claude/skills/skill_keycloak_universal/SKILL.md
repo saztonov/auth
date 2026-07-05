@@ -61,6 +61,14 @@ description: >-
   ⚠️ **`KC_ADMIN_BASE_URL` НЕ выводить из `OIDC_ISSUER`** (тот указывает на `auth.su10.ru`, где `/admin/*`
   не проксируется — см. «Факты контура» выше). Задать явно: `http://keycloak:8080` (если backend портала
   на сети `edge`) или временно `https://auth-admin.su10.ru`.
+- **Диагностика `invalid_client` при `client_credentials`** (admin/import-клиент) — проверять СТРОГО по
+  порядку, не гадать: (1) `enabled` клиента в Keycloak; (2) секрет — сверять **хэшем** (`sha256sum`), НЕ
+  длиной строки (сгенерированный `hex`/`base64`-секрет всегда одной длины независимо от значения — длина
+  ничего не доказывает); (3) реально ли `client_id` уходит в теле запроса, залогировав его прямо перед
+  `fetch`. ⚠️ JS-ловушка: `new URLSearchParams({ client_id: undefined, ... })` **не бросает ошибку**, а
+  тихо стрингует в буквальное `"undefined"` — если забыть env-переменную с client-id портала/импорт-клиента,
+  получите валидный HTTP-запрос с `client_id=undefined`, и Keycloak закономерно ответит `invalid_client`,
+  что выглядит как проблема секрета, а на деле — забытая переменная окружения.
 - **Login:** PKCE-challenge (S256) + state/nonce в короткоживущей httpOnly-cookie → redirect на Keycloak.
 - **Callback:** обмен code, верификация id_token (iss/aud/nonce/state), достать `{sub,email,emailVerified,preferredUsername, <portal>_user_id?}`. Токены — в httpOnly-cookie (BFF), браузер их не видит.
 - **Гейт per-request:** `jwtVerify` по JWKS Keycloak (`iss=issuer`, `aud=<portal>`, проверить `azp=<portal>`).
