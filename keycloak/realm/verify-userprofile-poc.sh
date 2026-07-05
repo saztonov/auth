@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
-# Проверка realm-as-code изменения: секция `userProfile` (unmanagedAttributePolicy) + маппер
-# `billhub_user_id` — на ОТДЕЛЬНОМ realm `up-poc` (su10 НЕ трогаем). Запускать на VPS.
+# Проверка realm-as-code: маппер `billhub_user_id` (config-cli) + user-profile через ПРЯМОЙ Admin API.
+# На ОТДЕЛЬНОМ realm `up-poc` (su10 НЕ трогаем). Запускать на VPS.
 #
 #   bash keycloak/realm/verify-userprofile-poc.sh
 #
-# Что доказывает:
-#   1. config-cli понимает ключ `userProfile` (версионный риск) и применяет realm без ошибок;
-#   2. сервис-аккаунт (без firstName/lastName) НЕ ломается required-именами (как service-account-billhub);
-#   3. атрибут `billhub_user_id`, выставленный через Admin API, СОХРАНЯЕТСЯ (не отбрасывается как unmanaged);
-#   4. маппер пробрасывает `billhub_user_id` в access-token (claim присутствует и равен заданному).
+# Почему так: config-cli 6.x НЕ применяет секцию userProfile (known issue adorsys #979 — оставляет
+# профиль дефолтным). Надёжно ставить user-profile прямым `PUT /admin/realms/<r>/users/profile`
+# (тот же эндпоинт, что и Admin-консоль). Клиент/мапперы config-cli делает штатно.
 #
-# Секреты/пароли/токены НЕ печатаются. su10/estimat/billhub не затрагиваются (отдельный realm up-poc, удаляется).
+# Что доказывает:
+#   0. (диагностика) после ОДНОГО config-cli профиль остаётся дефолтным (unmanaged отключён);
+#   1. прямой PUT users/profile ставит unmanagedAttributePolicy=ADMIN_EDIT;
+#   2. после этого атрибут billhub_user_id через Admin API СОХРАНЯЕТСЯ (не отбрасывается);
+#   3. маппер пробрасывает billhub_user_id в access-token (claim == заданному uuid);
+#   4. сервис-аккаунт без firstName/lastName не блокируется required-именами.
+#
+# Секреты/пароли/токены НЕ печатаются. su10/estimat/billhub не затрагиваются (realm up-poc удаляется при успехе).
 set -euo pipefail
 set +x
 
@@ -23,14 +28,13 @@ CURL_IMAGE="${CURL_IMAGE:-curlimages/curl:latest}"
 NODE_IMAGE="${NODE_IMAGE:-node:20-alpine}"
 CONFIG_CLI_IMAGE="${KC_CONFIG_CLI_IMAGE:-adorsys/keycloak-config-cli:latest-26}"
 
-fail() { echo "!! $*" >&2; exit 1; }
+fail() { echo "!! $*" >&2; echo "   (realm ${REALM} ОСТАВЛЕН для разбора; удалить: docker exec ${KC_CONTAINER} /opt/keycloak/bin/kcadm.sh delete realms/${REALM})" >&2; exit 1; }
 info() { echo "==> $*"; }
 
 command -v docker >/dev/null || fail "docker не найден"
 [[ -f "${KC_DIR}/.env" ]] || fail "нет ${KC_DIR}/.env"
 docker ps --format '{{.Names}}' | grep -qx "${KC_CONTAINER}" || fail "контейнер '${KC_CONTAINER}' не запущен"
 
-# admin-creds из .env (без эха): предпочтительно KEYCLOAK_ADMIN_*, иначе bootstrap-admin.
 getenv() { grep -E "^$1=" "${KC_DIR}/.env" | tail -1 | cut -d= -f2- | sed -e 's/^["'\'']//' -e 's/["'\'']$//'; }
 ADMIN_USER="$(getenv KEYCLOAK_ADMIN_USER)"; [[ -n "${ADMIN_USER}" ]] || ADMIN_USER="$(getenv KC_BOOTSTRAP_ADMIN_USERNAME)"
 ADMIN_PASS="$(getenv KEYCLOAK_ADMIN_PASSWORD)"; [[ -n "${ADMIN_PASS}" ]] || ADMIN_PASS="$(getenv KC_BOOTSTRAP_ADMIN_PASSWORD)"
@@ -43,70 +47,33 @@ docker exec -e AU="${ADMIN_USER}" -e AP="${ADMIN_PASS}" "${KC_CONTAINER}" \
   >/dev/null || fail "kcadm login не прошёл (проверьте admin-creds в .env)"
 kc() { docker exec "${KC_CONTAINER}" /opt/keycloak/bin/kcadm.sh "$@"; }
 
-TMP="$(mktemp -d)"; chmod 755 "${TMP}"   # config-cli-контейнер (иной uid) читает /config; секретов в файле нет
-cleanup() {
-  set +e
-  kc delete "realms/${REALM}" >/dev/null 2>&1
-  docker exec "${KC_CONTAINER}" sh -c 'rm -f /tmp/up-*.json' >/dev/null 2>&1
-  rm -rf "${TMP}"
-}
-trap cleanup EXIT
+TMP="$(mktemp -d)"; chmod 755 "${TMP}"
+trap 'rm -rf "${TMP}"; docker exec "${KC_CONTAINER}" sh -c "rm -f /tmp/up-*.json" >/dev/null 2>&1' EXIT
 kc delete "realms/${REALM}" >/dev/null 2>&1 || true   # чистый старт
 
-# --- realm-файл для config-cli: userProfile идентичен su10-realm.yaml + клиент с маппером + сервис-аккаунт ---
+# --- admin-токен для Admin REST (профиль ставим/читаем через него) ---
+get_admin_token() {
+  docker run --rm --network "${EDGE_NET}" -e ADMIN_USER -e ADMIN_PASS "${CURL_IMAGE}" sh -c \
+    'curl -s -d grant_type=password -d client_id=admin-cli -d "username=$ADMIN_USER" -d "password=$ADMIN_PASS" \
+     http://'"${KC_CONTAINER}"':8080/realms/master/protocol/openid-connect/token' \
+  | grep -oE '"access_token":"[^"]+"' | cut -d'"' -f4
+}
+ATOKEN="$(get_admin_token)"; [[ -n "${ATOKEN}" ]] || fail "не получил admin-токен"
+export ATOKEN
+api() { # $1=method $2=path [stdin=body] → печатает тело ответа
+  local m="$1" p="$2"
+  docker run --rm -i --network "${EDGE_NET}" -e ATOKEN "${CURL_IMAGE}" sh -c \
+    'curl -s -X '"$m"' -H "Authorization: Bearer $ATOKEN" -H "Content-Type: application/json" --data-binary @- \
+     http://'"${KC_CONTAINER}"':8080/admin/realms/'"${p}"
+}
+api_get() { docker run --rm --network "${EDGE_NET}" -e ATOKEN "${CURL_IMAGE}" sh -c \
+    'curl -s -H "Authorization: Bearer $ATOKEN" http://'"${KC_CONTAINER}"':8080/admin/realms/'"$1"; }
+profile_policy() { api_get "${REALM}/users/profile" | tr -d ' \n' | grep -o '"unmanagedAttributePolicy":"[^"]*"' || true; }
+
+# --- config-cli: realm + клиент с маппером + сервис-аккаунт (БЕЗ userProfile — его config-cli не применяет) ---
 cat > "${TMP}/up-poc.yaml" <<'YAML'
 realm: up-poc
 enabled: true
-userProfile:
-  attributes:
-    - name: username
-      displayName: "${username}"
-      validations:
-        length: { min: 3, max: 255 }
-        username-prohibited-characters: {}
-        up-username-not-idn-homograph: {}
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-    - name: email
-      displayName: "${email}"
-      validations:
-        email: {}
-        length: { max: 255 }
-      required:
-        roles: ["user"]
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-    - name: firstName
-      displayName: "${firstName}"
-      validations:
-        length: { max: 255 }
-        person-name-prohibited-characters: {}
-      required:
-        roles: ["user"]
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-    - name: lastName
-      displayName: "${lastName}"
-      validations:
-        length: { max: 255 }
-        person-name-prohibited-characters: {}
-      required:
-        roles: ["user"]
-      permissions:
-        view: ["admin", "user"]
-        edit: ["admin", "user"]
-      multivalued: false
-  groups:
-    - name: user-metadata
-      displayHeader: "User metadata"
-      displayDescription: "Attributes, which refer to user metadata"
-  unmanagedAttributePolicy: ADMIN_EDIT
 clients:
   - clientId: up-cli
     enabled: true
@@ -128,7 +95,6 @@ clients:
           id.token.claim: "true"
           userinfo.token.claim: "true"
           multivalued: "false"
-  # confidential-клиент с сервис-аккаунтом БЕЗ firstName/lastName — контроль, что required-имена его не блокируют
   - clientId: up-svc
     enabled: true
     protocol: openid-connect
@@ -145,26 +111,50 @@ users:
         - view-users
 YAML
 
-info "config-cli применяет realm ${REALM} (проверка: понимает ли userProfile + не блокирует ли сервис-аккаунт)"
+info "config-cli применяет realm + клиент(маппер) + сервис-аккаунт"
 export KEYCLOAK_USER="${ADMIN_USER}" KEYCLOAK_PASSWORD="${ADMIN_PASS}"
 docker run --rm --network "${EDGE_NET}" \
   -e KEYCLOAK_URL="http://${KC_CONTAINER}:8080" \
   -e KEYCLOAK_USER -e KEYCLOAK_PASSWORD \
-  -e KEYCLOAK_AVAILABILITYCHECK_ENABLED=true \
-  -e KEYCLOAK_AVAILABILITYCHECK_TIMEOUT=60s \
-  -e IMPORT_VARSUBSTITUTION_ENABLED=false \
-  -e IMPORT_MANAGED_USER=no-delete \
+  -e KEYCLOAK_AVAILABILITYCHECK_ENABLED=true -e KEYCLOAK_AVAILABILITYCHECK_TIMEOUT=60s \
+  -e IMPORT_VARSUBSTITUTION_ENABLED=false -e IMPORT_MANAGED_USER=no-delete \
   -e IMPORT_FILES_LOCATIONS=/config/up-poc.yaml \
-  -v "${TMP}:/config:ro" \
-  "${CONFIG_CLI_IMAGE}" \
-  || fail "config-cli упал — вероятно версия не понимает ключ userProfile, ЛИБО сервис-аккаунт заблокирован required-именами (см. вывод выше)"
-info "[ok] config-cli применил userProfile и создал сервис-аккаунт без ошибок"
+  -v "${TMP}:/config:ro" "${CONFIG_CLI_IMAGE}" \
+  || fail "config-cli упал (см. вывод выше)"
+info "[ok] config-cli применил клиент/маппер/сервис-аккаунт"
 
-# --- проверка политики (информационно) ---
-info "userProfile realm ${REALM}:"
-kc get "users/profile" -r "${REALM}" 2>/dev/null | tr -d ' \n' | grep -o '"unmanagedAttributePolicy":"[^"]*"' || echo "  (не удалось прочитать профиль)"
+# --- 0. диагностика: после ОДНОГО config-cli профиль дефолтный ---
+info "[DIAG] политика профиля после config-cli (ожидаемо пусто/дефолт): '$(profile_policy)'"
 
-# --- проверка: атрибут billhub_user_id СОХРАНЯЕТСЯ (не отбрасывается) ---
+# --- 1. прямой PUT user-profile (то, что config-cli не делает) ---
+cat > "${TMP}/up-profile.json" <<'JSON'
+{
+  "attributes": [
+    { "name": "username", "displayName": "${username}",
+      "validations": { "length": { "min": 3, "max": 255 }, "username-prohibited-characters": {}, "up-username-not-idn-homograph": {} },
+      "permissions": { "view": ["admin","user"], "edit": ["admin","user"] }, "multivalued": false },
+    { "name": "email", "displayName": "${email}",
+      "validations": { "email": {}, "length": { "max": 255 } }, "required": { "roles": ["user"] },
+      "permissions": { "view": ["admin","user"], "edit": ["admin","user"] }, "multivalued": false },
+    { "name": "firstName", "displayName": "${firstName}",
+      "validations": { "length": { "max": 255 }, "person-name-prohibited-characters": {} }, "required": { "roles": ["user"] },
+      "permissions": { "view": ["admin","user"], "edit": ["admin","user"] }, "multivalued": false },
+    { "name": "lastName", "displayName": "${lastName}",
+      "validations": { "length": { "max": 255 }, "person-name-prohibited-characters": {} }, "required": { "roles": ["user"] },
+      "permissions": { "view": ["admin","user"], "edit": ["admin","user"] }, "multivalued": false }
+  ],
+  "groups": [ { "name": "user-metadata", "displayHeader": "User metadata", "displayDescription": "Attributes, which refer to user metadata" } ],
+  "unmanagedAttributePolicy": "ADMIN_EDIT"
+}
+JSON
+info "прямой PUT /users/profile (Admin API)"
+api PUT "${REALM}/users/profile" < "${TMP}/up-profile.json" >/dev/null 2>&1 || true
+# curl -s возвращает 0 и на HTTP-ошибке → результат проверяем повторным GET политики
+POL="$(profile_policy)"
+[[ "${POL}" == *ADMIN_EDIT* ]] || fail "[FAIL] PUT профиля не дал ADMIN_EDIT (получено: '${POL:-<пусто>}')"
+info "[ok] user-profile применён напрямую: ${POL}"
+
+# --- 2. атрибут billhub_user_id СОХРАНЯЕТСЯ ---
 PW="up-$(head -c18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c16)-Aa1"
 TEST_UID="$(cat /proc/sys/kernel/random/uuid)"
 export PW
@@ -174,39 +164,39 @@ cat > "${TMP}/up-user.json" <<JSON
  "credentials":[{"type":"password","value":"${PW}","temporary":false}]}
 JSON
 docker cp "${TMP}/up-user.json" "${KC_CONTAINER}:/tmp/up-user.json" >/dev/null
-kc create users -r "${REALM}" -f /tmp/up-user.json >/dev/null || fail "не удалось создать up-user (профиль/валидация?)"
+kc create users -r "${REALM}" -f /tmp/up-user.json >/dev/null || fail "не удалось создать up-user"
 UID_KC="$(kc get users -r "${REALM}" -q username=up-user 2>/dev/null \
   | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)"
 [[ -n "${UID_KC}" ]] || fail "up-user не найден после создания"
-USER_JSON="$(kc get "users/${UID_KC}" -r "${REALM}" 2>/dev/null)"
-if printf '%s' "${USER_JSON}" | grep -q "${TEST_UID}"; then
-  info "[ok] атрибут billhub_user_id СОХРАНЁН в учётке (unmanagedAttributePolicy работает)"
+if kc get "users/${UID_KC}" -r "${REALM}" 2>/dev/null | grep -q "${TEST_UID}"; then
+  info "[ok] атрибут billhub_user_id СОХРАНЁН (unmanagedAttributePolicy работает)"
 else
-  fail "[FAIL] атрибут billhub_user_id ОТБРОШЕН — unmanagedAttributePolicy не сработала (без неё резолв-по-claim невозможен)"
+  fail "[FAIL] атрибут billhub_user_id ОТБРОШЕН даже после прямого PUT профиля"
 fi
 
-# --- проверка: claim billhub_user_id в access-token (маппер работает) ---
+# --- 3. claim в access-token ---
 RESP="$(docker run --rm --network "${EDGE_NET}" -e PW -e U=up-user "${CURL_IMAGE}" sh -c \
   'curl -s -d grant_type=password -d client_id='"${CLIENT}"' -d "username=$U" -d "password=$PW" \
    http://'"${KC_CONTAINER}"':8080/realms/'"${REALM}"'/protocol/openid-connect/token')"
 TOKEN="$(printf '%s' "${RESP}" | grep -o '"access_token":"[^"]*"' | cut -d'"' -f4)"
-[[ -n "${TOKEN}" ]] || fail "[FAIL] direct grant не вернул токен (вход не прошёл — см. up-cli/профиль)"
-# декод payload в node-контейнере (Buffer base64url надёжнее bash); токен идёт в stdin, печатаем только claim
+[[ -n "${TOKEN}" ]] || fail "[FAIL] direct grant не вернул токен"
 CLAIM="$(printf '%s' "${TOKEN}" | docker run --rm -i "${NODE_IMAGE}" node -e \
   'let t="";process.stdin.on("data",d=>t+=d).on("end",()=>{try{const p=JSON.parse(Buffer.from(t.trim().split(".")[1],"base64url").toString());process.stdout.write(String(p.billhub_user_id||""))}catch(e){}})')"
 if [[ "${CLAIM}" == "${TEST_UID}" ]]; then
   info "[ok] claim billhub_user_id в access-token присутствует и равен заданному (${CLAIM})"
 else
-  fail "[FAIL] claim billhub_user_id в токене отсутствует/не совпал (маппер не сработал). Получено: '${CLAIM:-<пусто>}'"
+  fail "[FAIL] claim billhub_user_id в токене отсутствует/не совпал. Получено: '${CLAIM:-<пусто>}'"
 fi
 
-# --- проверка: сервис-аккаунт (без имён) существует ---
+# --- 4. сервис-аккаунт без имён ---
 if kc get users -r "${REALM}" -q username=service-account-up-svc 2>/dev/null | grep -q service-account-up-svc; then
   info "[ok] сервис-аккаунт (без firstName/lastName) на месте — required-имена его не блокируют"
 else
   echo "    [warn] сервис-аккаунт service-account-up-svc не найден — сверьте вывод config-cli"
 fi
 
+kc delete "realms/${REALM}" >/dev/null 2>&1 || true
 echo
-info "РЕЗУЛЬТАТ: realm-изменение доказано — config-cli применил userProfile, атрибут billhub_user_id сохраняется,"
-info "          claim в access-token присутствует, сервис-аккаунт цел. realm ${REALM} удаляется (cleanup)."
+info "РЕЗУЛЬТАТ: рабочая связка доказана — маппер (config-cli) + user-profile (прямой Admin API PUT):"
+info "          атрибут billhub_user_id сохраняется, claim в токене, сервис-аккаунт цел. realm ${REALM} удалён."
+info "ВЫВОД: в su10 user-profile ставить прямым PUT /users/profile (config-cli его не применяет), маппер — в realm-as-code."
