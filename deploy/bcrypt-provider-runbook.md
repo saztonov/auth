@@ -125,6 +125,11 @@ bash keycloak/providers/bcrypt-spi/verify-bcrypt-poc.sh
 - **`not abstract and does not override abstract method close()/init()/postInit()`** — в
   `org.keycloak.provider.ProviderFactory` (KC 26.1.5) методы `init`/`postInit`/`close` абстрактные;
   фабрика реализует их явно (no-op). Исправлено.
+- **`NoClassDefFoundError: org/jboss/logging/Logger` в юнит-тестах** — конструирование
+  `PasswordCredentialModel` в тесте триггерит статический init `PasswordSecretData`, которому нужны
+  jboss-logging/Jackson (транзитивные `provided`-зависимости KC, в test-classpath отсутствуют). Решение:
+  ядро проверки вынесено в `verifyRaw(String,String)` (чистые String + at.favre), тесты бьют по нему —
+  классы модели KC в тестах не используются. Исправлено.
 - **Сборка не видит версию KC** — `build-jar.sh` берёт версию из контейнера `keycloak`; можно задать явно:
   `KC_VERSION=26.1.5 bash keycloak/providers/bcrypt-spi/build-jar.sh`.
 - **`docker: permission denied`** — запускать через `sudo bash …` или добавить пользователя в группу docker.

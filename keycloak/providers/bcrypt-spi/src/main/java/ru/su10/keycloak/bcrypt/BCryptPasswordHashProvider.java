@@ -68,11 +68,17 @@ public class BCryptPasswordHashProvider implements PasswordHashProvider {
 
     @Override
     public boolean verify(String rawPassword, PasswordCredentialModel credential) {
-        if (rawPassword == null) {
-            return false;
-        }
-        String hash = credential.getPasswordSecretData().getValue();
-        if (hash == null || hash.isEmpty()) {
+        // Полный bcrypt-хэш лежит в secretData.value (соль и cost внутри строки).
+        return verifyRaw(rawPassword, credential.getPasswordSecretData().getValue());
+    }
+
+    /**
+     * Ядро проверки: cost-guard + at.favre verifyer (truncate до 72 байт, как bcryptjs). Вынесено
+     * отдельно от {@link PasswordCredentialModel}, чтобы юнит-тестировать без рантайма Keycloak
+     * (jboss-logging/Jackson не нужны). {@code hash} — полная bcrypt-строка {@code $2[aby]$NN$...}.
+     */
+    boolean verifyRaw(String rawPassword, String hash) {
+        if (rawPassword == null || hash == null || hash.isEmpty()) {
             return false;
         }
         int cost = parseCost(hash);
