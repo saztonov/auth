@@ -34,3 +34,18 @@
 .pf-c-button.pf-m-primary:hover {
   background-color: #8c4a43;
 }
+
+/* Логотип шапки: замена стокового "KEYCLOAK" на su10 (masthead в Account Console — тёмный
+   независимо от темы, поэтому берём светлый вариант логотипа). content:url() поддерживается
+   всеми современными браузерами для <img> — не зависит от точной вложенности разметки PatternFly.
+   Несколько селекторов-фолбэков: точный класс brand-картинки может отличаться между версиями KC. */
+.pf-v5-c-brand,
+.pf-c-brand,
+.pf-v5-c-masthead__brand img,
+.pf-c-masthead__brand img,
+.pf-v5-c-masthead img,
+.pf-c-masthead img {
+  content: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMTAgNDgiIGZpbGw9Im5vbmUiIHJvbGU9ImltZyIgYXJpYS1sYWJlbD0i0KHQo18xMCI+CiAgPHRleHQgeD0iMSIgeT0iMzYiIGZvbnQtZmFtaWx5PSInSmV0QnJhaW5zIE1vbm8nLCdDYXNjYWRpYSBDb2RlJywnUm9ib3RvIE1vbm8nLENvbnNvbGFzLG1vbm9zcGFjZSIgZm9udC1zaXplPSIzOCIgZm9udC13ZWlnaHQ9IjcwMCIgbGV0dGVyLXNwYWNpbmc9IjEuNSIgZmlsbD0iI2ZmZmZmZiI+0KHQozx0c3BhbiBmaWxsPSIjZmZkOWQxIj5fPC90c3Bhbj4xMDwvdGV4dD4KPC9zdmc+Cg==") !important;
+  height: 32px;
+  width: auto;
+}
