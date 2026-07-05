@@ -120,6 +120,8 @@ bash keycloak/providers/bcrypt-spi/verify-bcrypt-poc.sh
 
 - **`Non-parseable POM … in comment after two dashes (--)`** — в XML-комментарии `pom.xml` нельзя `--`
   (двойной дефис). Использовать em-dash `—` или переформулировать. Исправлено в текущей версии.
+- **`cannot find symbol: class PasswordHashProviderFactory`** — фабрика лежит в артефакте
+  `keycloak-server-spi-private` (не в `keycloak-server-spi`). Зависимость добавлена в `pom.xml`. Исправлено.
 - **Сборка не видит версию KC** — `build-jar.sh` берёт версию из контейнера `keycloak`; можно задать явно:
   `KC_VERSION=26.1.5 bash keycloak/providers/bcrypt-spi/build-jar.sh`.
 - **`docker: permission denied`** — запускать через `sudo bash …` или добавить пользователя в группу docker.

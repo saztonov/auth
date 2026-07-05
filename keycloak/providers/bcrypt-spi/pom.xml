@@ -21,11 +21,18 @@
   </properties>
 
   <dependencies>
-    <!-- Keycloak SPI: PasswordHashProvider(Factory), PasswordCredentialModel/SecretData, PasswordPolicy.
-         provided — уже на classpath рантайма, в jar не пакуются. -->
+    <!-- Keycloak SPI (provided — уже на classpath рантайма, в jar не пакуются):
+         server-spi         → PasswordHashProvider, PasswordCredentialModel/SecretData, PasswordPolicy, ProviderFactory;
+         server-spi-private → PasswordHashProviderFactory (лежит именно в -private, package org.keycloak.credential.hash). -->
     <dependency>
       <groupId>org.keycloak</groupId>
       <artifactId>keycloak-server-spi</artifactId>
+      <version>${keycloak.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.keycloak</groupId>
+      <artifactId>keycloak-server-spi-private</artifactId>
       <version>${keycloak.version}</version>
       <scope>provided</scope>
     </dependency>
