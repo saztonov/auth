@@ -151,11 +151,14 @@ get_admin_token() {
 }
 ATOKEN="$(get_admin_token)"; [[ -n "${ATOKEN}" ]] || fail "не получил admin-токен для partialImport"
 export ATOKEN
-PI_CODE="$(docker run --rm --network "${EDGE_NET}" -e ATOKEN -v "${TMP}:/d:ro" "${CURL_IMAGE}" sh -c \
+# JSON шлём в stdin (--data-binary @-): curl-контейнер бежит под uid 100 и не может зайти в TMP (mode 700),
+# поэтому монтировать каталог нельзя — файл читает хост-shell (у corpsu права есть) и пайпит в stdin.
+PI_CODE="$(docker run --rm -i --network "${EDGE_NET}" -e ATOKEN "${CURL_IMAGE}" sh -c \
   'curl -s -o /dev/null -w "%{http_code}" -X POST \
    -H "Authorization: Bearer $ATOKEN" -H "Content-Type: application/json" \
-   --data @/d/poc-partial.json \
-   http://'"${KC_CONTAINER}"':8080/admin/realms/'"${REALM}"'/partialImport')"
+   --data-binary @- \
+   http://'"${KC_CONTAINER}"':8080/admin/realms/'"${REALM}"'/partialImport' \
+  < "${TMP}/poc-partial.json")"
 [[ "${PI_CODE}" == "200" ]] || fail "partialImport вернул HTTP ${PI_CODE} (ожидался 200)"
 info "[C] partialImport ок (HTTP 200)"
 

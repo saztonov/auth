@@ -140,5 +140,8 @@ bash keycloak/providers/bcrypt-spi/verify-bcrypt-poc.sh
   у контейнеров закрыт egress в npm-реестр. Теперь bcrypt-хэши делает `htpasswd` (образ `httpd:2.4-alpine`,
   бинарь в образе — сеть в рантайме не нужна), а `node` собирает JSON оффлайн. Заранее:
   `docker pull httpd:2.4-alpine`.
+- **POC: `curl: option --data: error encountered when reading a file`** — контейнер `curlimages/curl`
+  бежит под uid 100 и не может читать смонтированный `mktemp`-каталог (mode 700, владелец corpsu). JSON
+  для `partialImport` шлём в stdin (`--data-binary @-`), а не через монтирование каталога. Исправлено.
 - **target/ принадлежит root** (maven-контейнер пишет от root) — очистка при необходимости:
   `sudo rm -rf ~/auth/keycloak/providers/bcrypt-spi/target`.
