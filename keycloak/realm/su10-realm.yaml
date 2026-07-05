@@ -32,12 +32,13 @@ duplicateEmailsAllowed: false
 resetPasswordAllowed: false
 verifyEmail: false
 
-# Интернационализация: контур русскоязычный — дефолт ru (иначе тема рендерится по-английски).
+# Интернационализация: контур только русскоязычный. Единственная supportedLocale — Keycloak
+# рисует переключатель языка на странице входа только когда локалей больше одной; en убран,
+# чтобы переключателя не было вообще (не нужен, англоязычной версии не планируется).
 internationalizationEnabled: true
 defaultLocale: ru
 supportedLocales:
   - ru
-  - en
 
 # --- SMTP (хук на будущее; при появлении релея заполнить и включить verifyEmail/resetPasswordAllowed) ---
 # smtpServer:
