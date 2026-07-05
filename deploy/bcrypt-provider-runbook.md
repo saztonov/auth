@@ -136,5 +136,9 @@ bash keycloak/providers/bcrypt-spi/verify-bcrypt-poc.sh
 - **POC: `нет jar …`** — сначала выполнить шаг 2 (сборку).
 - **POC: `kcadm login не прошёл`** — проверить `KEYCLOAK_ADMIN_USER`/`KEYCLOAK_ADMIN_PASSWORD` (или
   `KC_BOOTSTRAP_ADMIN_*`) в `/opt/infra/keycloak/.env`.
+- **POC: `не удалось сгенерировать хэши`** — раньше хэши генерил `npm i bcryptjs` в контейнере, но на VPS
+  у контейнеров закрыт egress в npm-реестр. Теперь bcrypt-хэши делает `htpasswd` (образ `httpd:2.4-alpine`,
+  бинарь в образе — сеть в рантайме не нужна), а `node` собирает JSON оффлайн. Заранее:
+  `docker pull httpd:2.4-alpine`.
 - **target/ принадлежит root** (maven-контейнер пишет от root) — очистка при необходимости:
   `sudo rm -rf ~/auth/keycloak/providers/bcrypt-spi/target`.

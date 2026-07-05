@@ -24,6 +24,7 @@ CLIENT="${CLIENT:-poc-cli}"
 LIVE_PROVIDERS="${KC_DIR}/keycloak/providers"
 NODE_IMAGE="${NODE_IMAGE:-node:20-alpine}"
 CURL_IMAGE="${CURL_IMAGE:-curlimages/curl:latest}"
+HTPASSWD_IMAGE="${HTPASSWD_IMAGE:-httpd:2.4-alpine}"
 
 fail() { echo "!! $*" >&2; exit 1; }
 info() { echo "==> $*"; }
@@ -105,36 +106,40 @@ kc create realms -s "realm=${REALM}" -s enabled=true >/dev/null
 kc create clients -r "${REALM}" -s "clientId=${CLIENT}" -s publicClient=true \
   -s directAccessGrantsEnabled=true -s 'redirectUris=["*"]' >/dev/null
 
-# throwaway-пароль (в терминал/логи не выводим); хэши bcryptjs строит node и пишет import-JSON прямо в файлы.
+# throwaway-пароль (в терминал/логи не выводим).
 PW="poc-$(head -c18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c16)-Aa1"
 export PW
-info "[C] генерим bcryptjs-хэши (cost 12 и 10) и import-JSON (node, реальный bcryptjs)"
-docker run --rm -e PW -v "${TMP}:/out" "${NODE_IMAGE}" sh -c '
-  npm i -s bcryptjs >/dev/null 2>&1 || exit 1
-  node -e '"'"'
-    const b=require("bcryptjs"), fs=require("fs");
-    const pw=process.env.PW, users=[];
-    for (const cost of [12,10]) {
-      const base=b.hashSync(pw, b.genSaltSync(cost));  // bcryptjs даёт $2a или $2b
-      const body=base.slice(3);                        // "$NN$<salt+digest>" (одинаков для 2a/2b/2y)
-      for (const v of ["a","b","y"]) {
-        const h="$2"+v+body;
-        users.push({
-          username:"poc-2"+v+"-c"+cost, enabled:true,
-          email:"poc-2"+v+"-c"+cost+"@example.invalid", emailVerified:true,
-          credentials:[{ type:"password", algorithm:"bcrypt",
-            secretData:JSON.stringify({value:h}),
-            credentialData:JSON.stringify({hashIterations:cost, algorithm:"bcrypt"}) }]
-        });
-      }
+info "[C] генерим bcrypt-хэши (cost 12 и 10) через htpasswd (оффлайн) + import-JSON (node, без сети)"
+# htpasswd (образ httpd) даёт стандартный bcrypt $2y — сеть в рантайме НЕ нужна (в отличие от npm i bcryptjs).
+# Варианты $2a/$2b деривим ниже; для проверки verify источник хэша роли не играет (bcrypt = bcrypt).
+gen_bcrypt() { # $1=cost → печатает bcrypt-хэш throwaway-пароля (пароль через stdin, не в argv)
+  printf '%s' "${PW}" | docker run --rm -i "${HTPASSWD_IMAGE}" \
+    /usr/local/apache2/bin/htpasswd -niB -C "$1" u | sed 's/^[^:]*://'
+}
+H12="$(gen_bcrypt 12)"; H10="$(gen_bcrypt 10)"
+export H12 H10
+[[ "${H12}" == \$2* && "${H10}" == \$2* ]] || fail "htpasswd не выдал bcrypt-хэши (H12='${H12:0:4}…', H10='${H10:0:4}…')"
+# node — только сборка import-JSON (оффлайн, без npm): JSON.stringify корректно экранирует secretData/credentialData.
+docker run --rm -e H12 -e H10 -v "${TMP}:/out" "${NODE_IMAGE}" node -e '
+  const fs=require("fs");
+  const bases={12:process.env.H12,10:process.env.H10}, users=[];
+  for (const cost of [12,10]) {
+    const body=bases[cost].slice(3); // "$NN$<salt+digest>" — одинаков для $2a/$2b/$2y
+    for (const v of ["a","b","y"]) {
+      const h="$2"+v+body;
+      users.push({username:"poc-2"+v+"-c"+cost, enabled:true,
+        email:"poc-2"+v+"-c"+cost+"@example.invalid", emailVerified:true,
+        credentials:[{type:"password", algorithm:"bcrypt",
+          secretData:JSON.stringify({value:h}),
+          credentialData:JSON.stringify({hashIterations:cost, algorithm:"bcrypt"})}]});
     }
-    fs.writeFileSync("/out/poc-partial.json", JSON.stringify({ifResourceExists:"OVERWRITE", users}));
-    // кросс-проверка второго пути импорта: тот же credential для Admin API create-user (берём $2b, cost 12)
-    const cu=JSON.parse(JSON.stringify(users.find(u=>u.username==="poc-2b-c12")));
-    cu.username="poc-createuser"; cu.email="poc-createuser@example.invalid";
-    fs.writeFileSync("/out/poc-createuser.json", JSON.stringify(cu));
-  '"'"'
-' || fail "не удалось сгенерировать хэши/JSON (node/bcryptjs)"
+  }
+  fs.writeFileSync("/out/poc-partial.json", JSON.stringify({ifResourceExists:"OVERWRITE", users}));
+  // кросс-проверка второго пути импорта: тот же credential для Admin API create-user ($2b, cost 12)
+  const cu=JSON.parse(JSON.stringify(users.find(u=>u.username==="poc-2b-c12")));
+  cu.username="poc-createuser"; cu.email="poc-createuser@example.invalid";
+  fs.writeFileSync("/out/poc-createuser.json", JSON.stringify(cu));
+' || fail "не удалось собрать import-JSON (node)"
 
 # --- ЖЁСТКИЙ путь: realm partialImport (то, что использует payload-builder BillHub) ---
 info "[C] partialImport (путь BillHub) — через Admin REST с bearer-токеном"
