@@ -35,10 +35,14 @@
   background-color: #8c4a43;
 }
 
-/* Логотип шапки: замена стокового "KEYCLOAK" на su10 (masthead в Account Console — тёмный
-   независимо от темы, поэтому берём светлый вариант логотипа). content:url() поддерживается
-   всеми современными браузерами для <img> — не зависит от точной вложенности разметки PatternFly.
-   Несколько селекторов-фолбэков: точный класс brand-картинки может отличаться между версиями KC. */
+/* Логотип шапки: замена стокового "KEYCLOAK" на su10. Реальная разметка (проверено в DevTools,
+   KC 26.1): <img id="masthead-logo" class="keycloak__pageheader_brand" src="/resources/.../
+   admin/keycloak.v2/logo.svg">. Src ведёт в ресурсы АДМИН-темы (keycloak.v2), а не в ресурсы
+   темы account — поэтому подложить файл в account/resources/img/ не сработает, только CSS-замена
+   контента. content:url() на <img> подменяет отрисовку независимо от исходного src (Chrome/Edge/
+   Firefox). Широкие классы-фолбэки — для устойчивости к другой версии/локали KC. */
+#masthead-logo,
+.keycloak__pageheader_brand,
 .pf-v5-c-brand,
 .pf-c-brand,
 .pf-v5-c-masthead__brand img,
