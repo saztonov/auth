@@ -54,7 +54,17 @@ POST /admin/realms/{realm}/partialImport
 ```
 
 Admin API `POST /admin/realms/{realm}/users` (create-user) в тестах используется как мягкая
-кросс-проверка того же формата.
+кросс-проверка того же формата (**тоже проходит** — оба пути принимают `secretData`/`credentialData`).
+
+## Обязательные поля профиля (иначе вход ломается ДО проверки пароля)
+
+В Keycloak 26 декларативный user-profile по умолчанию требует **`firstName` и `lastName`**. Если их не
+задать при импорте, при первом входе срабатывает required action **VERIFY_PROFILE** и токен-эндпоинт
+отвечает `invalid_grant` / `Account is not fully set up` — ещё ДО обращения к нашему `verify`. Поэтому в
+payload на пользователя обязательно класть `firstName`, `lastName`, `email`, `emailVerified:true`,
+`enabled:true` (доказано на POC: без имён direct grant падал у ВСЕХ юзеров, включая контрольного с
+argon2-паролем; с именами — все входят). Альтернатива — ослабить требования в realm user-profile, но
+для BillHub проще заполнить имена из его БД.
 
 ## Перехэш после первого входа (важно для миграции)
 
@@ -76,5 +86,6 @@ const hash = bcrypt.hashSync(plainPassword, bcrypt.genSaltSync(12)); // "$2b$12$
 // credentialData = JSON.stringify({ hashIterations: 12, algorithm: 'bcrypt' })
 ```
 
-> Формат доказан для `$2a`/`$2b`/`$2y` при cost 12 (и 10) на realm `bcrypt-poc`: вход старым паролем
-> успешен, после входа `GET users/{id}/credentials` показывает `algorithm=argon2`.
+> **Доказано 2026-07-05** на живом KC 26.1.5 (realm `bcrypt-poc`, скрипт `bcrypt-spi/verify-bcrypt-poc.sh`):
+> вход старым паролем успешен для `$2a`/`$2b`/`$2y` при cost 12 и 10, после входа `algorithm=argon2`
+> (перехэш). Оба пути импорта (`partialImport` и Admin API create-user) принимают этот формат.

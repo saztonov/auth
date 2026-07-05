@@ -25,9 +25,16 @@
 
 - Собран минимальный SPI `bcrypt` под KC 26.1.x, исходники + unit-тесты + скрипты закоммичены в `auth`.
 - Версия рантайма подтверждена на VPS: **26.1.5**.
-- Первая сборка упала из-за `--` в XML-комментарии `pom.xml` (недопустимо в XML) → **исправлено**
-  (коммит с фиксом). После `git pull` сборка проходит.
-- POC на тест-realm `bcrypt-poc` — следующий шаг (раздел 3 ниже).
+- Сборка проходит (jar `keycloak-bcrypt-26.1.5.jar`, юнит-тесты 10/10 зелёные).
+- **POC пройден 2026-07-05**: на realm `bcrypt-poc` вход старым bcrypt-паролем успешен для `$2a/$2b/$2y`
+  при cost 12 и 10, после входа credential перехэширован в `argon2`. Оба пути импорта (`partialImport`
+  и Admin API create-user) принимают формат. Провайдер зарегистрирован в логах KC (`KC-SERVICES0047: bcrypt`).
+- **jar сейчас лежит на живом su10 KC** (`/opt/infra/keycloak/keycloak/providers/keycloak-bcrypt-26.1.5.jar`,
+  выкачен как часть POC) — инертен, пока ни один credential не использует `algorithm=bcrypt`.
+- Находки по пути (в траблшутинге ниже): `--` в XML-комментарии pom; фабрика в `keycloak-server-spi-private`;
+  абстрактные `init/postInit/close`; юнит-тесты через `verifyRaw` (без jboss-logging); egress в npm закрыт
+  → htpasswd; curl uid 100 не читает `mktemp` → stdin; `$2` в двойных кавычках при `set -u`;
+  **VERIFY_PROFILE требует firstName/lastName** у импортируемых юзеров.
 
 ---
 
@@ -145,3 +152,6 @@ bash keycloak/providers/bcrypt-spi/verify-bcrypt-poc.sh
   для `partialImport` шлём в stdin (`--data-binary @-`), а не через монтирование каталога. Исправлено.
 - **target/ принадлежит root** (maven-контейнер пишет от root) — очистка при необходимости:
   `sudo rm -rf ~/auth/keycloak/providers/bcrypt-spi/target`.
+- **Вход `invalid_grant` / `Account is not fully set up`** — не про пароль/verify: в KC 26 user-profile
+  требует `firstName`/`lastName`, без них срабатывает VERIFY_PROFILE ещё до проверки пароля. Импортируемым
+  юзерам задаём `firstName`/`lastName`/`email`/`emailVerified` (учтено в POC и в `CREDENTIAL_CONTRACT.md`).
