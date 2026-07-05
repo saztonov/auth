@@ -83,6 +83,12 @@ out
 dist
 .output
 
+# ИСКЛЮЧЕНИЕ: launcher/dist коммитим осознанно — VPS не может собрать витрину сам (нет npm, egress
+# в npm-реестр у контейнеров закрыт), доставка собранных файлов идёт строго через git (без scp/rsync
+# между машинами напрямую). Собирать здесь (dev-машина) и коммитить перед каждым релизом витрины.
+!launcher/dist/
+!launcher/dist/**
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js
