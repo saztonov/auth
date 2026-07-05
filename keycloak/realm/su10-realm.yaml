@@ -178,7 +178,8 @@ clients:
       # Внутренний id пользователя BillHub (users.id) как стабильный correlation-key: BillHub при
       # импорте/провижининге кладёт его в атрибут `billhub_user_id`, маппер пробрасывает в токен
       # (access+id+userinfo). Бэкенд резолвит юзера по этому claim из verified JWT — устойчиво к смене
-      # `sub` при переезде local→AD. Требует разрешённого атрибута в userProfile realm (см. ниже).
+      # `sub` при переезде local→AD. Требует разрешённого атрибута в user-profile realm — он ставится
+      # НЕ здесь, а прямым PUT (su10-userprofile.json + apply-userprofile.sh); config-cli его не применяет.
       - name: billhub_user_id
         protocol: openid-connect
         protocolMapper: oidc-usermodel-attribute-mapper
@@ -190,6 +191,21 @@ clients:
           id.token.claim: "true"
           userinfo.token.claim: "true"
           multivalued: "false"
+
+  # ---------------------------------------------------------------- BillHub import (ops, manage-realm)
+  # МАШИННЫЙ клиент ТОЛЬКО для массового импорта: `partialImport` требует роль manage-realm, которой нет
+  # у сервис-аккаунта billhub (у него только view/manage-users). client_credentials, без Standard flow.
+  # ⚠️ Мощные права → держим enabled:false; ВКЛЮЧИТЬ только на окно миграции (admin console Enabled=On,
+  #    либо enabled:true + config-cli), после импорта — выключить/удалить. Роли SA — в users: ниже.
+  #    Секрет $(env:BILLHUB_IMPORT_CLIENT_SECRET) должен быть в .env, иначе config-cli падает на подстановке.
+  - clientId: billhub-import
+    enabled: false
+    protocol: openid-connect
+    publicClient: false
+    standardFlowEnabled: false
+    directAccessGrantsEnabled: false
+    serviceAccountsEnabled: true
+    secret: $(env:BILLHUB_IMPORT_CLIENT_SECRET)
 
   # ---------------------------------------------------------------- Витрина порталов (SPA)
   - clientId: su10-launcher
@@ -240,3 +256,13 @@ users:
       realm-management:
         - view-users
         - manage-users
+  # Сервис-аккаунт импорт-клиента: manage-realm (partialImport) + manage-users/view-users (создание/чтение/
+  # атрибуты юзеров при импорте). Мощные права — только на окно миграции (клиент billhub-import enabled:false).
+  - username: service-account-billhub-import
+    enabled: true
+    serviceAccountClientId: billhub-import
+    clientRoles:
+      realm-management:
+        - manage-realm
+        - manage-users
+        - view-users

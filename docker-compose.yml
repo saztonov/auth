@@ -70,6 +70,9 @@ services:
       # Секреты клиентов для $(env:...) в realm-yaml (значения — из .env, не в git).
       ESTIMAT_CLIENT_SECRET: ${ESTIMAT_CLIENT_SECRET}
       BILLHUB_CLIENT_SECRET: ${BILLHUB_CLIENT_SECRET}
+      # Импорт-клиент billhub-import (manage-realm, окно миграции BillHub). Должен быть в .env, иначе
+      # config-cli падает на подстановке $(env:...) в su10-realm.yaml.
+      BILLHUB_IMPORT_CLIENT_SECRET: ${BILLHUB_IMPORT_CLIENT_SECRET}
     volumes:
       - ./keycloak/realm:/config:ro
     networks: [edge]
