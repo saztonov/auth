@@ -58,9 +58,14 @@ docker compose -p infra-nginx exec nginx nginx -s reload
 curl -s https://auth.su10.ru/realms/su10/.well-known/openid-configuration | head
 ```
 
-## Регулярный деплой (`deploy/deploy-auth.sh`)
+## Регулярный деплой
 
-Скрипт (запускать с dev-машины; хост/пути задаются переменными вверху скрипта):
+Есть два скрипта — под разные ситуации.
+
+### A. Полный деплой с dev-машины (`deploy/deploy-auth.sh`)
+
+Push по `ssh`+`rsync` (запускать с dev-машины; хост/пути задаются переменными вверху скрипта).
+Умеет то, что VPS-команда не умеет: **сборку витрины** (нужен npm) и **ingress-nginx**.
 1. rsync инфры репозитория → `/opt/infra/keycloak` (compose, themes, providers, realm; **без** `.env`);
 2. сборка витрины (`launcher`: `npm ci && npm run build`) → rsync `dist/` → `/opt/infra/launcher/dist`;
 3. копия `deploy/nginx/conf.d/keycloak.conf` → `/opt/infra/nginx/conf.d/` (заменяет живой keycloak.conf — backup + merge allowlist/cert вручную), `nginx -t` + reload;
@@ -69,6 +74,33 @@ curl -s https://auth.su10.ru/realms/su10/.well-known/openid-configuration | head
 
 ```bash
 ./deploy/deploy-auth.sh
+```
+
+### B. VPS-команда `deploy-auth [--migrate]` (`deploy/deploy-auth-vps.sh`)
+
+Запускается **на самом VPS из любой папки** (как `deploy-estimat`/`deploy-billhub`) — для быстрых
+правок темы su10 / провайдеров / realm без dev-машины. Витрину и nginx **не** трогает (на VPS нет
+npm; ingress редко меняется и root-only — это остаётся за сценарием A / ручной правкой).
+
+- `deploy-auth` — `git -C ~/auth pull` → rsync темы su10/провайдеров/realm в `/opt/infra/keycloak`
+  → рестарт **только** сервиса `keycloak` (`up -d --force-recreate`, в проде кэш темы включён).
+- `deploy-auth --migrate` — то же + накат realm-as-code (`--profile config run --rm config-cli`)
+  + `apply-userprofile.sh`. Это и есть «накат миграций» для auth (своей БД-миграции у Keycloak нет).
+
+Синк идёт **пофайлово** (su10 / providers / realm), поэтому `--delete` не сносит `themes/billhub`
+(её нет в этом репо), а собранный `keycloak-bcrypt-*.jar` сохраняется (`--exclude '*.jar'`).
+`docker-compose.yml` (владелец root) переписывается через `sudo cp` только при отличии; `.env` не трогается.
+
+Установка симлинка (один раз, репо на VPS — `~/auth`):
+```bash
+cd ~/auth && git pull --ff-only
+sudo ln -sf /home/corpsu/auth/deploy/deploy-auth-vps.sh /usr/local/bin/deploy-auth
+```
+
+Использование:
+```bash
+deploy-auth --migrate    # правки темы/провайдеров + накат realm-as-code
+deploy-auth              # только тема/провайдеры/рестарт, без realm
 ```
 
 ## Настройка realm вручную (первый раз)

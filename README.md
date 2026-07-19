@@ -16,7 +16,7 @@
 | `keycloak/providers/` | Кастомные SPI (в т.ч. bcrypt-провайдер для миграции паролей BillHub) |
 | `keycloak/realm/` | realm-as-code: клиенты `estimat`/`billhub`/`su10-launcher`, роли, мапперы (keycloak-config-cli) |
 | `launcher/` | SPA-витрина порталов (Vite + React, OIDC-клиент `su10-launcher`): плитки порталов, вход, «сменить пароль» |
-| `deploy/` | `deploy-auth.sh` + ingress-конфиг nginx (`auth.su10.ru`, `auth-admin.su10.ru`) |
+| `deploy/` | `deploy-auth.sh` (полный деплой с dev-машины), `deploy-auth-vps.sh` (VPS-команда `deploy-auth [--migrate]`) + ingress-конфиг nginx (`auth.su10.ru`, `auth-admin.su10.ru`) |
 | `docs/` | Архитектура, деплой, гайд по AD, что убрать из EstiMat |
 
 ## Домены
